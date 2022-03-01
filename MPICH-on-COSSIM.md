@@ -94,7 +94,7 @@ simple SyncNode
 		output out;
 }
 ```
-<b>You can add OMNET++ node adding the below code (do not forget to change the NumberOfHLANodes to default(4))</b>:
+<b>You can add OMNET++ node adding the below code (do not forget to change the NumberOfHLANodes to default(4)) in the above SynchNode </b>:
 
 ```
 simple Txc3 extends Txc0

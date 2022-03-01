@@ -6,4 +6,4 @@ We have created a Virual Machine which we have install everything there. You may
 
 You may reference to the following file in order to execute the MPICH on COSSIM (1node - up to 64cores) [MPICH-on-COSSIM-1node-64cores.md](MPICH-on-COSSIM-1node-64cores.md). You may see the related video for instructions [MPICH-on-COSSIM-1node-64cores](video).
 
-You may reference to the following file in order to execute the MPICH on COSSIM (multi-node) [MPICH-on-COSSIM.md](MPICH-on-COSSIM.md). You may see the related video for instructions [MPICH-on-COSSIM-1node-64cores](video).
+You may reference to the following file in order to execute the MPICH on COSSIM (multi-node) [MPICH-on-COSSIM.md](MPICH-on-COSSIM.md). You may see the related video for instructions [MPI_on COSSIM-multinode](video).

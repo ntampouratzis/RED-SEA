@@ -36,7 +36,7 @@ sudo umount /mnt/dev \
 sudo umount /mnt
 
 ## 6. Start-up the GEM5 node
-The following command will start the gem5 execution (you can see the statistics in folder $GEM5/node0). You may change the --num-cores from 1-64. The following command is for 8 cores:
+The following command will start the gem5 execution (you can see the statistics in folder $GEM5/node0). <b> You may change the --num-cores from 1-64. The following command is for 8 cores</b>:
 ```
 $GEM5/build/ARM/gem5.fast -d $GEM5/node0 $GEM5/configs/example/arm/starter_fs.py --kernel=vmlinux.arm64 --num-cores=8 --disk-image=ubuntu-18.04-arm64-docker.img --script=$GEM5/configs/boot/standAloneScript0.rcS
 ```

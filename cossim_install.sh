@@ -22,3 +22,5 @@ sudo apt install build-essential git m4 scons zlib1g zlib1g-dev libprotobuf-dev 
 
 
 ##omnet 5.0 prerequisites
+sudo add-apt-repository ppa:rock-core/qt4 (https://ubuntuhandbook.org/index.php/2020/07/install-qt4-ubuntu-20-04/)
+sudo apt install openjdk-8-jdk openjdk-8-jre tcl-dev tk-dev qt4-qmake libqt4-dev libqt4-opengl-dev openmpi-bin libopenmpi-dev clang

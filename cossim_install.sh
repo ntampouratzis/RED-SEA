@@ -26,3 +26,22 @@ sudo add-apt-repository ppa:rock-core/qt4 (https://ubuntuhandbook.org/index.php/
 sudo apt install openjdk-8-jdk openjdk-8-jre tcl-dev tk-dev qt4-qmake libqt4-dev libqt4-opengl-dev openmpi-bin libopenmpi-dev clang
 
 
+#Manual Installation
+`cd $HOME
+https://github.com/ntampouratzis/RED-SEA.git
+mv -f $HOME/RED-SEA $HOME/COSSIM`
+
+##cCERTI & Our SynchServer Installation
+`cd $HOME/COSSIM/cCERTI
+mkdir build_certi
+cd build_certi
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/COSSIM/cCERTI/build_certi $HOME/COSSIM/cCERTI`
+
+
+
+
+
+
+
+
+

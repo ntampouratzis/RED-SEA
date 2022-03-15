@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------------------
 // COSSIM - GEM5 HLA RunTime Infrastructure
-// Copyright (c) 2021, H2020 COSSIM.
-// Copyright (c) 2021, Exascale Performance Systems (EXAPSYS)
+// Copyright (c) 2022, H2020 COSSIM.
+// Copyright (c) 2022, Exascale Performance Systems (EXAPSYS)
 // Author: Tampouratzis Nikolaos, tampouratzis@exapsys.eu
 // ----------------------------------------------------------------------------
 
@@ -27,6 +27,8 @@ using std::endl ;
 using std::cout ;
 using std::vector ;
 
+namespace gem5{
+
 static PrettyDebug D("HLA_GEM5", __FILE__);
 
 // ----------------------------------------------------------------------------
@@ -51,7 +53,6 @@ HLA_GEM5::HLA_GEM5(std::string federate_name, int node, int _TotalNodes)
 /** Destructor
  */
 HLA_GEM5::~HLA_GEM5()
-    throw (RTI::FederateInternalError)
 {
 }
 
@@ -318,10 +319,7 @@ HLA_GEM5::receiveInteraction(RTI::InteractionClassHandle theInteraction,
                                  const RTI::ParameterHandleValuePairSet& theParameters,
                                  const RTI::FedTime& /*theTime*/,
                                  const char* /*theTag*/,
-                                 RTI::EventRetractionHandle /*theHandle*/) throw(RTI::InteractionClassNotKnown,
-                                                                                 RTI::InteractionParameterNotKnown,
-                                                                                 RTI::InvalidFederationTime,
-                                                                                 RTI::FederateInternalError) 
+                                 RTI::EventRetractionHandle /*theHandle*/) 
 {
     libhla::MessageBuffer buffer;
     RTI::ULong valueLength ;
@@ -682,7 +680,7 @@ HLA_GEM5::step()
  */
 void
 HLA_GEM5::announceSynchronizationPoint(const char *label, const char */*tag*/)
-    throw (RTI::FederateInternalError)
+    
 {
     if (strcmp(label, "Init") == 0) {
         paused = true ;
@@ -704,7 +702,6 @@ HLA_GEM5::announceSynchronizationPoint(const char *label, const char */*tag*/)
  */
 void
 HLA_GEM5::federationSynchronized(const char *label)
-    throw (RTI::FederateInternalError)
 {
     if (strcmp(label, "Init") == 0) {
         paused = false ;
@@ -719,8 +716,6 @@ HLA_GEM5::federationSynchronized(const char *label)
  */
 void
 HLA_GEM5::timeAdvanceGrant(const RTI::FedTime& theTime)
-    throw (RTI::InvalidFederationTime, RTI::TimeAdvanceWasNotInProgress, 
-	   RTI::FederateInternalError)
 {    
     granted = true ;
     localTime = theTime ;
@@ -748,8 +743,6 @@ void
 HLA_GEM5::reflectAttributeValues(RTI::ObjectHandle theObject, 
 			    const RTI::AttributeHandleValuePairSet & theAttributes, 
 			    const char * /*theTag*/) 
-	throw (RTI::ObjectNotKnown, RTI::AttributeNotKnown, RTI::FederateOwnsAttributes,
-	       RTI::FederateInternalError)
 {
   
 }
@@ -762,7 +755,6 @@ HLA_GEM5::removeObjectInstance(RTI::ObjectHandle theObject,
 			      const RTI::FedTime &,
 			      const char *,
 			      RTI::EventRetractionHandle)
-    throw (RTI::ObjectNotKnown, RTI::InvalidFederationTime, RTI::FederateInternalError)
 {
  
 }
@@ -774,8 +766,6 @@ void
 HLA_GEM5::discoverObjectInstance(RTI::ObjectHandle theObject,
 				RTI::ObjectClassHandle theObjectClass,
 				const char */*theObjectName*/)
-    throw (RTI::CouldNotDiscover, RTI::ObjectClassNotKnown, 
-	   RTI::FederateInternalError)
 {
    
 }
@@ -847,3 +837,5 @@ HLA_GEM5::RequestFunction(HLAInitializationRequest rqst){
   return ret;
 }
 //! --- END CERTI INITIALIZATION IP --- !//
+
+}

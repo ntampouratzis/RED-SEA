@@ -42,6 +42,9 @@
 #include "debug/KvmContext.hh"
 #include "params/ArmV8KvmCPU.hh"
 
+namespace gem5
+{
+
 using namespace ArmISA;
 
 // Unlike gem5, kvm doesn't count the SP as a normal integer register,
@@ -81,13 +84,16 @@ kvmFPReg(const int num)
         (SIMD_REG(fp_regs.vregs[1]) - SIMD_REG(fp_regs.vregs[0])) * num;
 }
 
-union KvmFPReg {
-    union {
+union KvmFPReg
+{
+    union
+    {
         uint32_t i;
         float f;
     } s[4];
 
-    union {
+    union
+    {
         uint64_t i;
         double f;
     } d[2];
@@ -250,6 +256,8 @@ ArmV8KvmCPU::updateKvmState()
 
     for (int i = 0; i < NUM_QREGS; ++i) {
         KvmFPReg reg;
+        if (!inAArch64(tc))
+            syncVecElemsToRegs(tc);
         auto v = tc->readVecReg(RegId(VecRegClass, i)).as<VecElem>();
         for (int j = 0; j < FP_REGS_PER_VFP_REG; j++)
             reg.s[j].i = v[j];
@@ -274,8 +282,8 @@ ArmV8KvmCPU::updateKvmState()
         setOneReg(ri.kvm, value);
     }
 
-    setOneReg(INT_REG(regs.pc), tc->instAddr());
-    DPRINTF(KvmContext, "  PC := 0x%x\n", tc->instAddr());
+    setOneReg(INT_REG(regs.pc), tc->pcState().instAddr());
+    DPRINTF(KvmContext, "  PC := 0x%x\n", tc->pcState().instAddr());
 }
 
 void
@@ -327,6 +335,8 @@ ArmV8KvmCPU::updateThreadContext()
         auto v = tc->getWritableVecReg(RegId(VecRegClass, i)).as<VecElem>();
         for (int j = 0; j < FP_REGS_PER_VFP_REG; j++)
             v[j] = reg.s[j].i;
+        if (!inAArch64(tc))
+            syncVecRegsToElems(tc);
     }
 
     for (const auto &ri : getSysRegMap()) {
@@ -395,3 +405,5 @@ ArmV8KvmCPU::getSysRegMap() const
 
     return sysRegMap;
 }
+
+} // namespace gem5

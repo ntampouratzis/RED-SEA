@@ -28,12 +28,16 @@
 #include "arch/arm/fastmodel/CortexA76/cortex_a76.hh"
 
 #include "arch/arm/fastmodel/iris/cpu.hh"
+#include "arch/arm/regs/misc.hh"
 #include "base/logging.hh"
 #include "dev/arm/base_gic.hh"
-#include "sim/core.hh"
 #include "systemc/tlm_bridge/gem5_to_tlm.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 void
@@ -89,6 +93,12 @@ CortexA76::setCluster(CortexA76Cluster *_cluster, int _num)
     set_evs_param("semihosting-stack_limit", params().semihosting_stack_limit);
     set_evs_param("trace_special_hlt_imm16", params().trace_special_hlt_imm16);
     set_evs_param("vfp-enable_at_reset", params().vfp_enable_at_reset);
+}
+
+void
+CortexA76::setResetAddr(Addr addr, bool secure)
+{
+    evs_base_cpu->setResetAddr(num, addr, secure);
 }
 
 Port &
@@ -196,4 +206,5 @@ CortexA76Cluster::getPort(const std::string &if_name, PortID idx)
     }
 }
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5

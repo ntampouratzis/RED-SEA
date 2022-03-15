@@ -42,6 +42,9 @@
 #include "arch/arm/insts/static_inst.hh"
 #include "tarmac_tracer.hh"
 
+namespace gem5
+{
+
 using namespace ArmISA;
 
 namespace Trace {
@@ -108,7 +111,7 @@ opModeToStr(OperatingMode opMode)
 // TarmacTracerRecord ctor
 TarmacTracerRecord::TarmacTracerRecord(Tick _when, ThreadContext *_thread,
                                      const StaticInstPtr _staticInst,
-                                     PCState _pc,
+                                     const PCStateBase &_pc,
                                      TarmacTracer& _tracer,
                                      const StaticInstPtr _macroStaticInst)
     : TarmacBaseRecord(_when, _thread, _staticInst,
@@ -120,7 +123,7 @@ TarmacTracerRecord::TarmacTracerRecord(Tick _when, ThreadContext *_thread,
 TarmacTracerRecord::TraceInstEntry::TraceInstEntry(
     const TarmacContext& tarmCtx,
     bool predicate)
-      : InstEntry(tarmCtx.thread, tarmCtx.pc, tarmCtx.staticInst, predicate)
+      : InstEntry(tarmCtx.thread, *tarmCtx.pc, tarmCtx.staticInst, predicate)
 {
     secureMode = isSecure(tarmCtx.thread);
 
@@ -153,7 +156,7 @@ TarmacTracerRecord::TraceMemEntry::TraceMemEntry(
 TarmacTracerRecord::TraceRegEntry::TraceRegEntry(
     const TarmacContext& tarmCtx,
     const RegId& reg)
-      : RegEntry(tarmCtx.pc),
+      : RegEntry(*tarmCtx.pc),
         regValid(false),
         regClass(reg.classValue()),
         regRel(reg.index())
@@ -348,7 +351,7 @@ TarmacTracerRecord::dump()
     const TarmacContext tarmCtx(
         thread,
         staticInst->isMicroop()? macroStaticInst : staticInst,
-        pc
+        *pc
     );
 
     if (!staticInst->isMicroop()) {
@@ -461,3 +464,4 @@ TarmacTracerRecord::TraceRegEntry::print(
 }
 
 } // namespace Trace
+} // namespace gem5

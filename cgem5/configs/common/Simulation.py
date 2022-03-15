@@ -425,6 +425,12 @@ def repeatSwitch(testsys, repeat_switch_cpu_list, maxtick, switch_freq):
             return exit_event
 
 def run(options, root, testsys, cpu_class):
+    # Remove existing files from previous simulation (COSSIM)
+    NodeNum = options.nodeNum
+    os.system("rm -rf $GEM5/McPat/mcpatNode" + str(NodeNum) + ".xml")
+    os.system("rm -rf $GEM5/McPat/mcpatOutput" + str(NodeNum) + ".txt")
+    os.system("rm -rf $GEM5/McPat/energy" + str(NodeNum) + ".txt")
+    # END Remove existing files from previous simulation (COSSIM)
     if options.checkpoint_dir:
         cptdir = options.checkpoint_dir
     elif m5.options.outdir:
@@ -710,7 +716,7 @@ def run(options, root, testsys, cpu_class):
         takeSimpointCheckpoints(simpoints, interval_length, cptdir)
 
     # Restore from SimPoint checkpoints
-    elif options.restore_simpoint_checkpoint != None:
+    elif options.restore_simpoint_checkpoint:
         restoreSimpointCheckpoint()
 
     else:
@@ -733,3 +739,12 @@ def run(options, root, testsys, cpu_class):
 
     if exit_event.getCode() != 0:
         print("Simulated exit code not 0! Exit code is", exit_event.getCode())
+        
+    # Execute the McPat Script (COSSIM)
+    McPATXml = options.McPATXml #Specify the McPAT xml ProcessorDescriptionFile
+    if McPATXml == "empty":
+      print ("Power results are not available because McPat xml file is not exist!\n")
+    else:
+      print ("Power results are calculated with xml file: " + McPATXml + "\n")
+      os.system("$GEM5/runMcPat.sh " + str(NodeNum) + " " + str(McPATXml) + " &")
+    # END Execute the McPat Script (COSSIM)

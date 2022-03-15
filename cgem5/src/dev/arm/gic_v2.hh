@@ -51,17 +51,20 @@
 #include "arch/arm/interrupts.hh"
 #include "base/addr_range.hh"
 #include "base/bitunion.hh"
-#include "cpu/intr_control.hh"
 #include "dev/arm/base_gic.hh"
 #include "dev/io_device.hh"
 #include "dev/platform.hh"
 #include "params/GicV2.hh"
 
+namespace gem5
+{
+
 class GicV2 : public BaseGic, public BaseGicRegisters
 {
   protected:
     // distributor memory addresses
-    enum {
+    enum
+    {
         GICD_CTLR          = 0x000, // control register
         GICD_TYPER         = 0x004, // controller type
         GICD_IIDR          = 0x008, // implementer id
@@ -90,7 +93,8 @@ class GicV2 : public BaseGic, public BaseGicRegisters
     static const AddrRange GICD_ICFGR;      // interrupt config registers
 
     // cpu memory addresses
-    enum {
+    enum
+    {
         GICC_CTLR  = 0x00, // CPU control register
         GICC_PMR   = 0x04, // Interrupt priority mask
         GICC_BPR   = 0x08, // binary point register
@@ -176,7 +180,8 @@ class GicV2 : public BaseGic, public BaseGicRegisters
     uint32_t itLines;
 
     /** Registers "banked for each connected processor" per ARM IHI0048B */
-    struct BankedRegs : public Serializable {
+    struct BankedRegs : public Serializable
+    {
         /** GICD_I{S,C}ENABLER0
          * interrupt enable bits for first 32 interrupts, 1b per interrupt */
         uint32_t intEnabled;
@@ -544,5 +549,7 @@ class GicV2 : public BaseGic, public BaseGicRegisters
     Tick writeCpu(PacketPtr pkt);
     void writeCpu(ContextID ctx, Addr daddr, uint32_t data) override;
 };
+
+} // namespace gem5
 
 #endif //__DEV_ARM_GIC_H__

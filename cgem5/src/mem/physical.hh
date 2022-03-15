@@ -47,6 +47,12 @@
 #include "mem/packet.hh"
 #include "sim/serialize.hh"
 
+namespace gem5
+{
+
+namespace memory
+{
+
 /**
  * Forward declaration to avoid header dependencies.
  */
@@ -273,5 +279,8 @@ class PhysicalMemory : public Serializable
     void unserializeStore(CheckpointIn &cp);
 
 };
+
+} // namespace memory
+} // namespace gem5
 
 #endif //__MEM_PHYSICAL_HH__

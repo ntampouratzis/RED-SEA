@@ -33,6 +33,15 @@
 #include "base/intmath.hh"
 #include "debug/RubyNetwork.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
+namespace garnet
+{
+
 // Constructor for the flit
 flit::flit(int id, int  vc, int vnet, RouteInfo route, int size,
     MsgPtr msg_ptr, int MsgSize, uint32_t bWidth, Tick curTime)
@@ -120,3 +129,7 @@ flit::functionalWrite(Packet *pkt)
     Message *msg = m_msg_ptr.get();
     return msg->functionalWrite(pkt);
 }
+
+} // namespace garnet
+} // namespace ruby
+} // namespace gem5

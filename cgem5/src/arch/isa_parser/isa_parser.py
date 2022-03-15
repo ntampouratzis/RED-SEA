@@ -44,7 +44,7 @@ import traceback
 # get type names
 from types import *
 
-from m5.util.grammar import Grammar
+from grammar import Grammar
 from .operand_list import *
 from .operand_types import *
 from .util import *
@@ -121,9 +121,11 @@ class Template(object):
             &std::remove_pointer_t<decltype(this)>::destRegIdxArr));
             '''
 
+            pcstate_decl = f'{self.parser.namespace}::PCState ' \
+                    '__parserAutoPCState;\n'
             myDict['op_decl'] = operands.concatAttrStrings('op_decl')
             if operands.readPC or operands.setPC:
-                myDict['op_decl'] += 'TheISA::PCState __parserAutoPCState;\n'
+                myDict['op_decl'] += pcstate_decl
 
             # In case there are predicated register reads and write, declare
             # the variables for register indicies. It is being assumed that
@@ -133,7 +135,8 @@ class Template(object):
             if operands.predRead:
                 myDict['op_decl'] += 'uint8_t _sourceIndex = 0;\n'
             if operands.predWrite:
-                myDict['op_decl'] += 'M5_VAR_USED uint8_t _destIndex = 0;\n'
+                myDict['op_decl'] += \
+                    '[[maybe_unused]] uint8_t _destIndex = 0;\n'
 
             is_src = lambda op: op.is_src
             is_dest = lambda op: op.is_dest
@@ -143,15 +146,14 @@ class Template(object):
             myDict['op_dest_decl'] = \
                       operands.concatSomeAttrStrings(is_dest, 'op_dest_decl')
             if operands.readPC:
-                myDict['op_src_decl'] += \
-                    'TheISA::PCState __parserAutoPCState;\n'
+                myDict['op_src_decl'] += pcstate_decl
             if operands.setPC:
-                myDict['op_dest_decl'] += \
-                    'TheISA::PCState __parserAutoPCState;\n'
+                myDict['op_dest_decl'] += pcstate_decl
 
             myDict['op_rd'] = operands.concatAttrStrings('op_rd')
             if operands.readPC:
-                myDict['op_rd'] = '__parserAutoPCState = xc->pcState();\n' + \
+                myDict['op_rd'] = \
+                        'set(__parserAutoPCState, xc->pcState());\n' + \
                                   myDict['op_rd']
 
             # Compose the op_wb string. If we're going to write back the
@@ -463,8 +465,6 @@ class InstObjParams(object):
         # function (which should be provided by isa_desc via a declare)
         if 'IsFloating' in self.flags:
             self.fp_enable_check = 'fault = checkFpEnableFault(xc);'
-        elif 'IsVector' in self.flags:
-            self.fp_enable_check = 'fault = checkVecEnableFault(xc);'
         else:
             self.fp_enable_check = ''
 
@@ -483,7 +483,7 @@ class InstObjParams(object):
 
 class ISAParser(Grammar):
     def __init__(self, output_dir):
-        super(ISAParser, self).__init__()
+        super().__init__()
         self.output_dir = output_dir
 
         self.filename = None # for output file watermarking/scaremongering
@@ -606,8 +606,10 @@ class ISAParser(Grammar):
 
             fn = 'decoder-ns.hh.inc'
             assert(fn in self.files)
-            f.write('namespace %s {\n#include "%s"\n}\n'
-                    % (self.namespace, fn))
+            f.write('namespace gem5\n{\n')
+            f.write('namespace %s {\n#include "%s"\n} // namespace %s\n'
+                    % (self.namespace, fn, self.namespace))
+            f.write('} // namespace gem5')
             f.write('\n#endif  // __ARCH_%s_GENERATED_DECODER_HH__\n' %
                     self.isa_name.upper())
 
@@ -648,11 +650,13 @@ class ISAParser(Grammar):
 
                 fn = 'decoder-ns.cc.inc'
                 assert(fn in self.files)
+                print('namespace gem5\n{\n', file=f)
                 print('namespace %s {' % self.namespace, file=f)
                 if splits > 1:
                     print('#define __SPLIT %u' % i, file=f)
                 print('#include "%s"' % fn, file=f)
-                print('}', file=f)
+                print('} // namespace %s' % self.namespace, file=f)
+                print('} // namespace gem5', file=f)
 
         # instruction execution
         splits = self.splits[self.get_file('exec')]
@@ -669,11 +673,13 @@ class ISAParser(Grammar):
 
                 fn = 'exec-ns.cc.inc'
                 assert(fn in self.files)
+                print('namespace gem5\n{\n', file=f)
                 print('namespace %s {' % self.namespace, file=f)
                 if splits > 1:
                     print('#define __SPLIT %u' % i, file=f)
                 print('#include "%s"' % fn, file=f)
-                print('}', file=f)
+                print('} // namespace %s' % self.namespace, file=f)
+                print('} // namespace gem5', file=f)
 
     scaremonger_template ='''// DO NOT EDIT
 // This file was automatically generated from an ISA description:
@@ -1152,6 +1158,7 @@ del wrap
         'top_level_decode_block : decode_block'
         codeObj = t[1]
         codeObj.wrap_decode_block('''
+using namespace gem5;
 StaticInstPtr
 %(isa_name)s::Decoder::decodeInst(%(isa_name)s::ExtMachInst machInst)
 {
@@ -1257,7 +1264,7 @@ StaticInstPtr
         # just wrap the decoding code from the block as a case in the
         # outer switch statement.
         codeObj.wrap_decode_block('\n%s\n' % ''.join(case_list),
-                                  'M5_UNREACHABLE;\n')
+                                  'GEM5_UNREACHABLE;\n')
         codeObj.has_decode_default = (case_list == ['default:'])
         t[0] = codeObj
 
@@ -1280,7 +1287,7 @@ StaticInstPtr
 
     def prep_int_lit_case_label(self, lit):
         if lit >= 2**32:
-            return 'case ULL(%#x): ' % lit
+            return 'case %#xULL: ' % lit
         else:
             return 'case %#x: ' % lit
 
@@ -1430,8 +1437,7 @@ StaticInstPtr
         # Create a wrapper class that allows us to grab the current parser.
         class InstObjParamsWrapper(InstObjParams):
             def __init__(iop, *args, **kwargs):
-                super(InstObjParamsWrapper, iop).__init__(
-                        self, *args, **kwargs)
+                super().__init__(self, *args, **kwargs)
         self.exportContext['InstObjParams'] = InstObjParamsWrapper
         self.exportContext.update(self.templateMap)
 

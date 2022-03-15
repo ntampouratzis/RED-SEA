@@ -42,6 +42,9 @@
 #include "arch/arm/insts/pred_inst.hh"
 #include "arch/arm/insts/static_inst.hh"
 
+namespace gem5
+{
+
 namespace ArmISAInst {
 
 class MicroTmeOp : public ArmISA::MicroOp
@@ -62,7 +65,7 @@ class MicroTmeBasic64 : public MicroTmeOp
     {}
 
     std::string generateDisassembly(Addr pc,
-                                    const Loader::SymbolTable *symtab) const;
+                                    const loader::SymbolTable *symtab) const;
 };
 
 class TmeImmOp64 : public ArmISA::ArmStaticInst
@@ -77,7 +80,7 @@ class TmeImmOp64 : public ArmISA::ArmStaticInst
     {}
 
     std::string generateDisassembly(Addr pc,
-                                    const Loader::SymbolTable *symtab) const;
+                                    const loader::SymbolTable *symtab) const;
 };
 
 class TmeRegNone64 : public ArmISA::ArmStaticInst
@@ -92,7 +95,7 @@ class TmeRegNone64 : public ArmISA::ArmStaticInst
     {}
 
     std::string generateDisassembly(Addr pc,
-                                    const Loader::SymbolTable *symtab) const;
+                                    const loader::SymbolTable *symtab) const;
 };
 
 class Tstart64 : public TmeRegNone64
@@ -163,6 +166,7 @@ class Tcommit64 : public MacroTmeOp
     Tcommit64(ArmISA::ExtMachInst _machInst);
 };
 
-} // namespace
+} // namespace ArmISAInst
+} // namespace gem5
 
 #endif

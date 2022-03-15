@@ -45,6 +45,9 @@
 #include "dev/arm/gic_v3.hh"
 #include "sim/serialize.hh"
 
+namespace gem5
+{
+
 class Gicv3CPUInterface;
 class Gicv3Distributor;
 class Gicv3Its;
@@ -72,7 +75,8 @@ class Gicv3Redistributor : public Serializable
     static const uint32_t RD_base  = 0x0;
     static const uint32_t SGI_base = 0x10000;
 
-    enum {
+    enum
+    {
         // Control Register
         GICR_CTLR  = RD_base + 0x0000,
         // Implementer Identification Register
@@ -104,7 +108,8 @@ class Gicv3Redistributor : public Serializable
 
     bool peInLowPowerState;
 
-    enum {
+    enum
+    {
         // Interrupt Group Register 0
         GICR_IGROUPR0   = SGI_base + 0x0080,
         // Interrupt Set-Enable Register 0
@@ -133,7 +138,8 @@ class Gicv3Redistributor : public Serializable
     static const AddrRange GICR_IPRIORITYR;
 
     // GIC physical LPI Redistributor register
-    enum {
+    enum
+    {
         // Set LPI Pending Register
         GICR_SETLPIR = RD_base + 0x0040,
         // Clear LPI Pending Register
@@ -255,5 +261,7 @@ class Gicv3Redistributor : public Serializable
     void clearPPInt(uint32_t int_id);
     void write(Addr addr, uint64_t data, size_t size, bool is_secure_access);
 };
+
+} // namespace gem5
 
 #endif //__DEV_ARM_GICV3_REDISTRIBUTOR_H__

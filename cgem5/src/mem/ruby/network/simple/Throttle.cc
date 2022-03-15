@@ -39,6 +39,12 @@
 #include "mem/ruby/slicc_interface/Message.hh"
 #include "mem/ruby/system/RubySystem.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 const int MESSAGE_SIZE_MULTIPLIER = 1000;
 //const int BROADCAST_SCALING = 4; // Have a 16p system act like a 64p systems
 const int BROADCAST_SCALING = 1;
@@ -206,22 +212,22 @@ Throttle::regStats()
     for (MessageSizeType type = MessageSizeType_FIRST;
          type < MessageSizeType_NUM; ++type) {
         throttleStats.m_msg_counts[(unsigned int)type] =
-            new Stats::Vector(&throttleStats,
+            new statistics::Vector(&throttleStats,
             csprintf("msg_count.%s", MessageSizeType_to_string(type)).c_str());
         throttleStats.m_msg_counts[(unsigned int)type]
             ->init(Network::getNumberOfVirtualNetworks())
-            .flags(Stats::nozero)
+            .flags(statistics::nozero)
             ;
 
         throttleStats.m_msg_bytes[(unsigned int) type] =
-            new Stats::Formula(&throttleStats,
+            new statistics::Formula(&throttleStats,
             csprintf("msg_bytes.%s", MessageSizeType_to_string(type)).c_str());
         throttleStats.m_msg_bytes[(unsigned int) type]
-            ->flags(Stats::nozero)
+            ->flags(statistics::nozero)
             ;
 
         *(throttleStats.m_msg_bytes[(unsigned int) type]) =
-            *(throttleStats.m_msg_counts[type]) * Stats::constant(
+            *(throttleStats.m_msg_counts[type]) * statistics::constant(
                 Network::MessageSizeType_to_int(type));
     }
 }
@@ -264,9 +270,12 @@ network_message_to_size(Message *net_msg_ptr)
 }
 
 Throttle::
-ThrottleStats::ThrottleStats(Stats::Group *parent, const NodeID &nodeID)
-    : Stats::Group(parent, csprintf("throttle%02i", nodeID).c_str()),
+ThrottleStats::ThrottleStats(statistics::Group *parent, const NodeID &nodeID)
+    : statistics::Group(parent, csprintf("throttle%02i", nodeID).c_str()),
       m_link_utilization(this, "link_utilization")
 {
 
 }
+
+} // namespace ruby
+} // namespace gem5

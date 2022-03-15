@@ -47,24 +47,26 @@ class Operand(object):
     src_reg_constructor = '\n\tsetSrcRegIdx(_numSrcRegs++, RegId(%s, %s));'
     dst_reg_constructor = '\n\tsetDestRegIdx(_numDestRegs++, RegId(%s, %s));'
 
-    def buildReadCode(self, func = None):
+    def buildReadCode(self, predRead, func=None):
         subst_dict = {"name": self.base_name,
                       "func": func,
                       "reg_idx": self.reg_spec,
                       "ctype": self.ctype}
         if hasattr(self, 'src_reg_idx'):
-            subst_dict['op_idx'] = self.src_reg_idx
+            subst_dict['op_idx'] = \
+                    '_sourceIndex++' if predRead else str(self.src_reg_idx)
         code = self.read_code % subst_dict
         return '%s = %s;\n' % (self.base_name, code)
 
-    def buildWriteCode(self, func = None):
+    def buildWriteCode(self, predWrite, func=None):
         subst_dict = {"name": self.base_name,
                       "func": func,
                       "reg_idx": self.reg_spec,
                       "ctype": self.ctype,
                       "final_val": self.base_name}
         if hasattr(self, 'dest_reg_idx'):
-            subst_dict['op_idx'] = self.dest_reg_idx
+            subst_dict['op_idx'] = \
+                    '_destIndex++' if predWrite else str(self.dest_reg_idx)
         code = self.write_code % subst_dict
         return '''
         {
@@ -200,7 +202,7 @@ class IntRegOperand(Operand):
         if (self.ctype == 'float' or self.ctype == 'double'):
             error('Attempt to read integer register as FP')
         if self.read_code != None:
-            return self.buildReadCode('readIntRegOperand')
+            return self.buildReadCode(predRead, 'readIntRegOperand')
 
         int_reg_val = ''
         if predRead:
@@ -217,7 +219,7 @@ class IntRegOperand(Operand):
         if (self.ctype == 'float' or self.ctype == 'double'):
             error('Attempt to write integer register as FP')
         if self.write_code != None:
-            return self.buildWriteCode('setIntRegOperand')
+            return self.buildWriteCode(predWrite, 'setIntRegOperand')
 
         if predWrite:
             wp = 'true'
@@ -264,7 +266,7 @@ class FloatRegOperand(Operand):
 
     def makeRead(self, predRead):
         if self.read_code != None:
-            return self.buildReadCode('readFloatRegOperandBits')
+            return self.buildReadCode(predRead, 'readFloatRegOperandBits')
 
         if predRead:
             rindex = '_sourceIndex++'
@@ -280,7 +282,7 @@ class FloatRegOperand(Operand):
 
     def makeWrite(self, predWrite):
         if self.write_code != None:
-            return self.buildWriteCode('setFloatRegOperandBits')
+            return self.buildWriteCode(predWrite, 'setFloatRegOperandBits')
 
         if predWrite:
             wp = '_destIndex++'
@@ -319,7 +321,7 @@ class VecRegOperand(Operand):
 
     def makeDeclElem(self, elem_op):
         (elem_name, elem_ext) = elem_op
-        (elem_spec, dflt_elem_ext, zeroing) = self.elems[elem_name]
+        (elem_spec, dflt_elem_ext) = self.elems[elem_name]
         if elem_ext:
             ext = elem_ext
         else:
@@ -356,7 +358,7 @@ class VecRegOperand(Operand):
     # Read destination register to write
     def makeReadWElem(self, elem_op):
         (elem_name, elem_ext) = elem_op
-        (elem_spec, dflt_elem_ext, zeroing) = self.elems[elem_name]
+        (elem_spec, dflt_elem_ext) = self.elems[elem_name]
         if elem_ext:
             ext = elem_ext
         else:
@@ -369,7 +371,7 @@ class VecRegOperand(Operand):
     def makeReadW(self, predWrite):
         func = 'getWritableVecRegOperand'
         if self.read_code != None:
-            return self.buildReadCode(func)
+            return self.buildReadCode(predWrite, func)
 
         if predWrite:
             rindex = '_destIndex++'
@@ -393,7 +395,7 @@ class VecRegOperand(Operand):
     # Normal source operand read
     def makeReadElem(self, elem_op, name):
         (elem_name, elem_ext) = elem_op
-        (elem_spec, dflt_elem_ext, zeroing) = self.elems[elem_name]
+        (elem_spec, dflt_elem_ext) = self.elems[elem_name]
 
         if elem_ext:
             ext = elem_ext
@@ -407,7 +409,7 @@ class VecRegOperand(Operand):
     def makeRead(self, predRead):
         func = 'readVecRegOperand'
         if self.read_code != None:
-            return self.buildReadCode(func)
+            return self.buildReadCode(predRead, func)
 
         if predRead:
             rindex = '_sourceIndex++'
@@ -437,7 +439,7 @@ class VecRegOperand(Operand):
     def makeWrite(self, predWrite):
         func = 'setVecRegOperand'
         if self.write_code != None:
-            return self.buildWriteCode(func)
+            return self.buildWriteCode(predWrite, func)
 
         wb = '''
         if (traceData) {
@@ -447,7 +449,7 @@ class VecRegOperand(Operand):
         return wb
 
     def finalize(self, predRead, predWrite):
-        super(VecRegOperand, self).finalize(predRead, predWrite)
+        super().finalize(predRead, predWrite)
         if self.is_dest:
             self.op_rd = self.makeReadW(predWrite) + self.op_rd
 
@@ -537,7 +539,7 @@ class VecPredRegOperand(Operand):
     def makeRead(self, predRead):
         func = 'readVecPredRegOperand'
         if self.read_code != None:
-            return self.buildReadCode(func)
+            return self.buildReadCode(predRead, func)
 
         if predRead:
             rindex = '_sourceIndex++'
@@ -555,7 +557,7 @@ class VecPredRegOperand(Operand):
     def makeReadW(self, predWrite):
         func = 'getWritableVecPredRegOperand'
         if self.read_code != None:
-            return self.buildReadCode(func)
+            return self.buildReadCode(predWrite, func)
 
         if predWrite:
             rindex = '_destIndex++'
@@ -573,7 +575,7 @@ class VecPredRegOperand(Operand):
     def makeWrite(self, predWrite):
         func = 'setVecPredRegOperand'
         if self.write_code != None:
-            return self.buildWriteCode(func)
+            return self.buildWriteCode(predWrite, func)
 
         wb = '''
         if (traceData) {
@@ -583,7 +585,7 @@ class VecPredRegOperand(Operand):
         return wb
 
     def finalize(self, predRead, predWrite):
-        super(VecPredRegOperand, self).finalize(predRead, predWrite)
+        super().finalize(predRead, predWrite)
         if self.is_dest:
             self.op_rd = self.makeReadW(predWrite) + self.op_rd
 
@@ -619,7 +621,7 @@ class CCRegOperand(Operand):
         if (self.ctype == 'float' or self.ctype == 'double'):
             error('Attempt to read condition-code register as FP')
         if self.read_code != None:
-            return self.buildReadCode('readCCRegOperand')
+            return self.buildReadCode(predRead, 'readCCRegOperand')
 
         int_reg_val = ''
         if predRead:
@@ -636,7 +638,7 @@ class CCRegOperand(Operand):
         if (self.ctype == 'float' or self.ctype == 'double'):
             error('Attempt to write condition-code register as FP')
         if self.write_code != None:
-            return self.buildWriteCode('setCCRegOperand')
+            return self.buildWriteCode(predWrite, 'setCCRegOperand')
 
         if predWrite:
             wp = 'true'
@@ -685,7 +687,7 @@ class ControlRegOperand(Operand):
         if (self.ctype == 'float' or self.ctype == 'double'):
             error('Attempt to read control register as FP')
         if self.read_code != None:
-            return self.buildReadCode('readMiscRegOperand')
+            return self.buildReadCode(predRead, 'readMiscRegOperand')
 
         if predRead:
             rindex = '_sourceIndex++'
@@ -699,7 +701,7 @@ class ControlRegOperand(Operand):
         if (self.ctype == 'float' or self.ctype == 'double'):
             error('Attempt to write control register as FP')
         if self.write_code != None:
-            return self.buildWriteCode('setMiscRegOperand')
+            return self.buildWriteCode(predWrite, 'setMiscRegOperand')
 
         if predWrite:
             windex = '_destIndex++'
@@ -726,15 +728,19 @@ class MemOperand(Operand):
 
     def makeRead(self, predRead):
         if self.read_code != None:
-            return self.buildReadCode()
+            return self.buildReadCode(predRead)
         return ''
 
     def makeWrite(self, predWrite):
         if self.write_code != None:
-            return self.buildWriteCode()
+            return self.buildWriteCode(predWrite)
         return ''
 
 class PCStateOperand(Operand):
+    def __init__(self, parser, *args, **kwargs):
+        super().__init__(parser, *args, **kwargs)
+        self.parser = parser
+
     def makeConstructor(self, predRead, predWrite):
         return ''
 
@@ -745,7 +751,8 @@ class PCStateOperand(Operand):
                 (self.base_name, self.reg_spec)
         else:
             # The whole PC state itself.
-            return '%s = xc->pcState();\n' % self.base_name
+            return f'{self.base_name} = ' \
+                    f'xc->pcState().as<{self.parser.namespace}::PCState>();\n'
 
     def makeWrite(self, predWrite):
         if self.reg_spec:
@@ -754,10 +761,10 @@ class PCStateOperand(Operand):
                 (self.reg_spec, self.base_name)
         else:
             # The whole PC state itself.
-            return 'xc->pcState(%s);\n' % self.base_name
+            return f'xc->pcState({self.base_name});\n'
 
     def makeDecl(self):
-        ctype = 'TheISA::PCState'
+        ctype = f'{self.parser.namespace}::PCState'
         if self.isPCPart():
             ctype = self.ctype
         # Note that initializations in the declarations are solely

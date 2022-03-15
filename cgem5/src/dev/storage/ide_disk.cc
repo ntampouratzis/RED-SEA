@@ -50,13 +50,17 @@
 #include <string>
 
 #include "base/chunk_generator.hh"
+#include "base/compiler.hh"
 #include "base/cprintf.hh" // csprintf
 #include "base/trace.hh"
 #include "debug/IdeDisk.hh"
 #include "dev/storage/disk_image.hh"
 #include "dev/storage/ide_ctrl.hh"
-#include "sim/core.hh"
+#include "sim/cur_tick.hh"
 #include "sim/sim_object.hh"
+
+namespace gem5
+{
 
 IdeDisk::IdeDisk(const Params &p)
     : SimObject(p), ctrl(NULL), image(p.image), diskDelay(p.delay),
@@ -388,19 +392,20 @@ IdeDisk::doDmaDataRead()
 }
 
 IdeDisk::
-IdeDiskStats::IdeDiskStats(Stats::Group *parent)
-    : Stats::Group(parent, "IdeDisk"),
-      ADD_STAT(dmaReadFullPages, UNIT_COUNT,
+IdeDiskStats::IdeDiskStats(statistics::Group *parent)
+    : statistics::Group(parent, "IdeDisk"),
+      ADD_STAT(dmaReadFullPages, statistics::units::Count::get(),
                "Number of full page size DMA reads (not PRD)."),
-      ADD_STAT(dmaReadBytes, UNIT_BYTE,
+      ADD_STAT(dmaReadBytes, statistics::units::Byte::get(),
                "Number of bytes transfered via DMA reads (not PRD)."),
-      ADD_STAT(dmaReadTxs, UNIT_COUNT,
+      ADD_STAT(dmaReadTxs, statistics::units::Count::get(),
                "Number of DMA read transactions (not PRD)."),
-      ADD_STAT(dmaWriteFullPages, UNIT_COUNT,
+      ADD_STAT(dmaWriteFullPages, statistics::units::Count::get(),
                "Number of full page size DMA writes."),
-      ADD_STAT(dmaWriteBytes, UNIT_BYTE,
+      ADD_STAT(dmaWriteBytes, statistics::units::Byte::get(),
                "Number of bytes transfered via DMA writes."),
-      ADD_STAT(dmaWriteTxs, UNIT_COUNT, "Number of DMA write transactions.")
+      ADD_STAT(dmaWriteTxs, statistics::units::Count::get(),
+               "Number of DMA write transactions.")
 {
 }
 
@@ -583,7 +588,7 @@ IdeDisk::startDma(const uint32_t &prdTableBase)
         panic("Inconsistent device state for DMA start!\n");
 
     // PRD base address is given by bits 31:2
-    curPrdAddr = pciToDma((Addr)(prdTableBase & ~ULL(0x3)));
+    curPrdAddr = pciToDma((Addr)(prdTableBase & ~0x3ULL));
 
     dmaState = Dma_Transfer;
 
@@ -682,7 +687,7 @@ IdeDisk::startCommand()
         // Supported DMA commands
       case WDCC_WRITEDMA:
         dmaRead = true;  // a write to the disk is a DMA read from memory
-        M5_FALLTHROUGH;
+        [[fallthrough]];
       case WDCC_READDMA:
         if (!(cmdReg.drive & DRIVE_LBA_BIT))
             panic("Attempt to perform CHS access, only supports LBA\n");
@@ -1182,3 +1187,5 @@ IdeDisk::unserialize(CheckpointIn &cp)
     UNSERIALIZE_ENUM(dmaState);
     UNSERIALIZE_ARRAY(dataBuffer, MAX_DMA_SIZE);
 }
+
+} // namespace gem5

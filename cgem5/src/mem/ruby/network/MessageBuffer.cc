@@ -49,7 +49,13 @@
 #include "debug/RubyQueue.hh"
 #include "mem/ruby/system/RubySystem.hh"
 
-using m5::stl_helpers::operator<<;
+namespace gem5
+{
+
+namespace ruby
+{
+
+using stl_helpers::operator<<;
 
 MessageBuffer::MessageBuffer(const Params &p)
     : SimObject(p), m_stall_map_size(0),
@@ -85,19 +91,19 @@ MessageBuffer::MessageBuffer(const Params &p)
 
     // stats
     m_not_avail_count
-        .flags(Stats::nozero);
+        .flags(statistics::nozero);
 
     m_buf_msgs
-        .flags(Stats::nozero);
+        .flags(statistics::nozero);
 
     m_stall_count
-        .flags(Stats::nozero);
+        .flags(statistics::nozero);
 
     m_occupancy
-        .flags(Stats::nozero);
+        .flags(statistics::nozero);
 
     m_stall_time
-        .flags(Stats::nozero);
+        .flags(statistics::nozero);
 
     if (m_max_size > 0) {
         m_occupancy = m_buf_msgs / m_max_size;
@@ -526,3 +532,6 @@ MessageBuffer::functionalAccess(Packet *pkt, bool is_read, WriteMask *mask)
 
     return num_functional_accesses;
 }
+
+} // namespace ruby
+} // namespace gem5

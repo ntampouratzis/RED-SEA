@@ -47,6 +47,9 @@
 #include "params/AtomicSimpleCPU.hh"
 #include "sim/probe/probe.hh"
 
+namespace gem5
+{
+
 class AtomicSimpleCPU : public BaseSimpleCPU
 {
   public:
@@ -89,7 +92,7 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     isCpuDrained() const
     {
         SimpleExecContext &t_info = *threadInfo[curThread];
-        return t_info.thread->microPC() == 0 &&
+        return t_info.thread->pcState().microPC() == 0 &&
             !locked && !t_info.stayAtPC;
     }
 
@@ -228,10 +231,11 @@ class AtomicSimpleCPU : public BaseSimpleCPU
     }
 
     void
-    htmSendAbortSignal(HtmFailureFaultCause cause) override
+    htmSendAbortSignal(ThreadID tid, uint64_t htm_uid,
+                       HtmFailureFaultCause cause) override
     {
         panic("htmSendAbortSignal() is for timing accesses, and should "
-              "never be called on AtomicSimpleCPU.\n");
+              "never be called on AtomicSimpleCPU.");
     }
 
     Fault writeMem(uint8_t *data, unsigned size,
@@ -250,5 +254,7 @@ class AtomicSimpleCPU : public BaseSimpleCPU
      */
     void printAddr(Addr a);
 };
+
+} // namespace gem5
 
 #endif // __CPU_SIMPLE_ATOMIC_HH__

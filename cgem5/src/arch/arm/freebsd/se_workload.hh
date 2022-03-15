@@ -35,10 +35,15 @@
 #define __ARCH_ARM_FREEBSD_SE_WORKLOAD_HH__
 
 #include "arch/arm/freebsd/freebsd.hh"
-#include "arch/arm/registers.hh"
+#include "arch/arm/page_size.hh"
+#include "arch/arm/regs/cc.hh"
+#include "arch/arm/regs/int.hh"
 #include "arch/arm/se_workload.hh"
 #include "params/ArmEmuFreebsd.hh"
 #include "sim/syscall_desc.hh"
+
+namespace gem5
+{
 
 namespace ArmISA
 {
@@ -48,7 +53,9 @@ class EmuFreebsd : public SEWorkload
   public:
     using Params = ArmEmuFreebsdParams;
 
-    EmuFreebsd(const Params &p) : SEWorkload(p) {}
+    EmuFreebsd(const Params &p) : SEWorkload(p, PageShift) {}
+
+    ByteOrder byteOrder() const override { return ByteOrder::little; }
 
     struct BaseSyscallABI {};
     struct SyscallABI32 : public SEWorkload::SyscallABI32,
@@ -63,20 +70,18 @@ class EmuFreebsd : public SEWorkload
 
 } // namespace ArmISA
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 template <typename ABI>
 struct Result<ABI, SyscallReturn,
-    typename std::enable_if_t<std::is_base_of<
-        ArmISA::EmuFreebsd::BaseSyscallABI, ABI>::value>>
+    typename std::enable_if_t<std::is_base_of_v<
+        ArmISA::EmuFreebsd::BaseSyscallABI, ABI>>>
 {
     static void
     store(ThreadContext *tc, const SyscallReturn &ret)
     {
-        if (ret.suppressed() || ret.needsRetry())
-            return;
-
         RegVal val;
         if (ret.successful()) {
             tc->setCCReg(ArmISA::CCREG_C, 0);
@@ -91,6 +96,7 @@ struct Result<ABI, SyscallReturn,
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
+} // namespace gem5
 
 #endif // __ARCH_ARM_FREEBSD_SE_WORKLOAD_HH__

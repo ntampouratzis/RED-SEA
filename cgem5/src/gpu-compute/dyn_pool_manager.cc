@@ -2,8 +2,6 @@
  * Copyright (c) 2020 Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * For use for simulation and test purposes only
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -36,6 +34,9 @@
 #include "base/trace.hh"
 #include "debug/GPUVRF.hh"
 #include "gpu-compute/dyn_pool_manager.hh"
+
+namespace gem5
+{
 
 // return the min number of elements that the manager can reserve given
 // a request for "size" elements
@@ -158,3 +159,5 @@ DynPoolManager::regionSize(std::pair<uint32_t, uint32_t> &region)
         return region.second + poolSize() - region.first + 1;
     }
 }
+
+} // namespace gem5

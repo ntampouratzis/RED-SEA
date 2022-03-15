@@ -3,8 +3,8 @@
  * All rights reserved
  *
  * ----------------------------------------------------------------------------
- * Copyright (c) 2021, H2020 COSSIM.
- * Copyright (c) 2021, Exascale Performance Systems (EXAPSYS)
+ * Copyright (c) 2022, H2020 COSSIM.
+ * Copyright (c) 2022, Exascale Performance Systems (EXAPSYS)
  * ----------------------------------------------------------------------------
  * 
  * The license below extends only to copyright in the software and shall
@@ -65,6 +65,7 @@
 #include "dev/net/etherpkt.hh"
 #include "params/COSSIMEtherLink.hh"
 #include "sim/core.hh"
+#include "sim/cur_tick.hh"
 #include "sim/serialize.hh"
 #include "sim/system.hh"
 
@@ -78,6 +79,7 @@
 
 
 using namespace std;
+namespace gem5{
 
 using std::string ;
 using std::cout ;
@@ -341,4 +343,6 @@ COSSIMEtherLink::TimeConversion(const Params &p){
     ReceivePacketTicks = RxPacketTime * SystemClockTicks;
     
     
+}
+
 }

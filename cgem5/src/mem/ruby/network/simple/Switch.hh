@@ -64,6 +64,12 @@
 #include "mem/ruby/protocol/MessageSizeType.hh"
 #include "params/Switch.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 class MessageBuffer;
 class NetDest;
 class SimpleNetwork;
@@ -84,7 +90,7 @@ class Switch : public BasicRouter
     void resetStats();
     void collateStats();
     void regStats();
-    const Stats::Formula & getMsgCount(unsigned int type) const
+    const statistics::Formula & getMsgCount(unsigned int type) const
     { return *(switchStats.m_msg_counts[type]); }
 
     void print(std::ostream& out) const;
@@ -108,14 +114,14 @@ class Switch : public BasicRouter
 
 
   public:
-    struct SwitchStats : public Stats::Group
+    struct SwitchStats : public statistics::Group
     {
-        SwitchStats(Stats::Group *parent);
+        SwitchStats(statistics::Group *parent);
 
         // Statistical variables
-        Stats::Formula m_avg_utilization;
-        Stats::Formula* m_msg_counts[MessageSizeType_NUM];
-        Stats::Formula* m_msg_bytes[MessageSizeType_NUM];
+        statistics::Formula m_avg_utilization;
+        statistics::Formula* m_msg_counts[MessageSizeType_NUM];
+        statistics::Formula* m_msg_bytes[MessageSizeType_NUM];
     } switchStats;
 };
 
@@ -126,5 +132,8 @@ operator<<(std::ostream& out, const Switch& obj)
     out << std::flush;
     return out;
 }
+
+} // namespace ruby
+} // namespace gem5
 
 #endif // __MEM_RUBY_NETWORK_SIMPLE_SWITCH_HH__

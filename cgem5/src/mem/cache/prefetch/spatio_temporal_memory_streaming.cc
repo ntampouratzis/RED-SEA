@@ -32,7 +32,12 @@
 #include "mem/cache/prefetch/associative_set_impl.hh"
 #include "params/STeMSPrefetcher.hh"
 
-namespace Prefetcher {
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Prefetcher, prefetch);
+namespace prefetch
+{
 
 STeMS::STeMS(const STeMSPrefetcherParams &p)
   : Queued(p), spatialRegionSize(p.spatial_region_size),
@@ -246,4 +251,5 @@ STeMS::reconstructSequence(
     }
 }
 
-} // namespace Prefetcher
+} // namespace prefetch
+} // namespace gem5

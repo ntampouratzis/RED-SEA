@@ -28,6 +28,12 @@
 
 #include "mem/ruby/network/simple/SimpleLink.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 SimpleExtLink::SimpleExtLink(const Params &p)
     : BasicExtLink(p)
 {
@@ -59,3 +65,6 @@ SimpleIntLink::print(std::ostream& out) const
 {
     out << name();
 }
+
+} // namespace ruby
+} // namespace gem5

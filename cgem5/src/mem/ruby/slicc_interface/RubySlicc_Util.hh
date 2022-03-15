@@ -58,6 +58,12 @@
 #include "mem/ruby/common/WriteMask.hh"
 #include "mem/ruby/protocol/RubyRequestType.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 inline Cycles zero_time() { return Cycles(0); }
 
 inline Cycles intToCycles(int c) { return Cycles(c); }
@@ -279,5 +285,8 @@ countBoolVec(BoolVec bVec)
     }
     return count;
 }
+
+} // namespace ruby
+} // namespace gem5
 
 #endif //__MEM_RUBY_SLICC_INTERFACE_RUBYSLICC_UTIL_HH__

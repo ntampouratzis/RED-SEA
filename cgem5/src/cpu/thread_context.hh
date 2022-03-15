@@ -47,12 +47,15 @@
 
 #include "arch/generic/htm.hh"
 #include "arch/generic/isa.hh"
-#include "arch/registers.hh"
-#include "arch/types.hh"
+#include "arch/generic/pcstate.hh"
+#include "arch/vecregs.hh"
 #include "base/types.hh"
 #include "config/the_isa.hh"
 #include "cpu/pc_event.hh"
 #include "cpu/reg_class.hh"
+
+namespace gem5
+{
 
 // @todo: Figure out a more architecture independent way to obtain the ITB and
 // DTB pointers.
@@ -65,9 +68,12 @@ class BaseMMU;
 class BaseTLB;
 class CheckerCPU;
 class Checkpoint;
+class InstDecoder;
 class PortProxy;
 class Process;
 class System;
+class Packet;
+using PacketPtr = Packet *;
 
 /**
  * ThreadContext is the external interface to all thread state for
@@ -138,21 +144,11 @@ class ThreadContext : public PCEventScope
 
     virtual BaseISA *getIsaPtr() = 0;
 
-    virtual TheISA::Decoder *getDecoderPtr() = 0;
+    virtual InstDecoder *getDecoderPtr() = 0;
 
     virtual System *getSystemPtr() = 0;
 
-    virtual PortProxy &getPhysProxy() = 0;
-
-    virtual PortProxy &getVirtProxy() = 0;
-
-    /**
-     * Initialise the physical and virtual port proxies and tie them to
-     * the data port of the CPU.
-     *
-     * tc ThreadContext for the virtual-to-physical translation
-     */
-    virtual void initMemProxies(ThreadContext *tc) = 0;
+    virtual void sendFunctional(PacketPtr pkt);
 
     virtual Process *getProcessPtr() = 0;
 
@@ -205,36 +201,7 @@ class ThreadContext : public PCEventScope
         readVecReg(const RegId& reg) const = 0;
     virtual TheISA::VecRegContainer& getWritableVecReg(const RegId& reg) = 0;
 
-    /** Vector Register Lane Interfaces. */
-    /** @{ */
-    /** Reads source vector 8bit operand. */
-    virtual ConstVecLane8
-    readVec8BitLaneReg(const RegId& reg) const = 0;
-
-    /** Reads source vector 16bit operand. */
-    virtual ConstVecLane16
-    readVec16BitLaneReg(const RegId& reg) const = 0;
-
-    /** Reads source vector 32bit operand. */
-    virtual ConstVecLane32
-    readVec32BitLaneReg(const RegId& reg) const = 0;
-
-    /** Reads source vector 64bit operand. */
-    virtual ConstVecLane64
-    readVec64BitLaneReg(const RegId& reg) const = 0;
-
-    /** Write a lane of the destination vector register. */
-    virtual void setVecLane(const RegId& reg,
-            const LaneData<LaneSize::Byte>& val) = 0;
-    virtual void setVecLane(const RegId& reg,
-            const LaneData<LaneSize::TwoByte>& val) = 0;
-    virtual void setVecLane(const RegId& reg,
-            const LaneData<LaneSize::FourByte>& val) = 0;
-    virtual void setVecLane(const RegId& reg,
-            const LaneData<LaneSize::EightByte>& val) = 0;
-    /** @} */
-
-    virtual const TheISA::VecElem& readVecElem(const RegId& reg) const = 0;
+    virtual RegVal readVecElem(const RegId& reg) const = 0;
 
     virtual const TheISA::VecPredRegContainer& readVecPredReg(
             const RegId& reg) const = 0;
@@ -250,32 +217,24 @@ class ThreadContext : public PCEventScope
     virtual void setVecReg(const RegId& reg,
             const TheISA::VecRegContainer& val) = 0;
 
-    virtual void setVecElem(const RegId& reg, const TheISA::VecElem& val) = 0;
+    virtual void setVecElem(const RegId& reg, RegVal val) = 0;
 
     virtual void setVecPredReg(const RegId& reg,
             const TheISA::VecPredRegContainer& val) = 0;
 
     virtual void setCCReg(RegIndex reg_idx, RegVal val) = 0;
 
-    virtual TheISA::PCState pcState() const = 0;
+    virtual const PCStateBase &pcState() const = 0;
 
-    virtual void pcState(const TheISA::PCState &val) = 0;
-
+    virtual void pcState(const PCStateBase &val) = 0;
     void
-    setNPC(Addr val)
+    pcState(Addr addr)
     {
-        TheISA::PCState pc_state = pcState();
-        pc_state.setNPC(val);
-        pcState(pc_state);
+        std::unique_ptr<PCStateBase> new_pc(getIsaPtr()->newPCState(addr));
+        pcState(*new_pc);
     }
 
-    virtual void pcStateNoRecord(const TheISA::PCState &val) = 0;
-
-    virtual Addr instAddr() const = 0;
-
-    virtual Addr nextInstAddr() const = 0;
-
-    virtual MicroPC microPC() const = 0;
+    virtual void pcStateNoRecord(const PCStateBase &val) = 0;
 
     virtual RegVal readMiscRegNoEffect(RegIndex misc_reg) const = 0;
 
@@ -292,9 +251,6 @@ class ThreadContext : public PCEventScope
     virtual unsigned readStCondFailures() const = 0;
 
     virtual void setStCondFailures(unsigned sc_failures) = 0;
-
-    // Same with st cond failures.
-    virtual Counter readFuncExeInst() const = 0;
 
     // This function exits the thread context in the CPU and returns
     // 1 if the CPU has no more active threads (meaning it's OK to exit);
@@ -328,10 +284,10 @@ class ThreadContext : public PCEventScope
     virtual void setVecRegFlat(RegIndex idx,
             const TheISA::VecRegContainer& val) = 0;
 
-    virtual const TheISA::VecElem& readVecElemFlat(RegIndex idx,
+    virtual RegVal readVecElemFlat(RegIndex idx,
             const ElemIndex& elem_idx) const = 0;
     virtual void setVecElemFlat(RegIndex idx, const ElemIndex& elem_idx,
-            const TheISA::VecElem& val) = 0;
+            RegVal val) = 0;
 
     virtual const TheISA::VecPredRegContainer &
         readVecPredRegFlat(RegIndex idx) const = 0;
@@ -378,5 +334,7 @@ void unserialize(ThreadContext &tc, CheckpointIn &cp);
  * @param old_tc Source ThreadContext.
  */
 void takeOverFrom(ThreadContext &new_tc, ThreadContext &old_tc);
+
+} // namespace gem5
 
 #endif

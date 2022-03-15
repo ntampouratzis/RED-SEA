@@ -39,6 +39,9 @@
 #include "mem/packet_access.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
 X86ISA::I82094AA::I82094AA(const Params &p)
     : BasicPioDevice(p, 20), extIntPic(p.external_int_pic),
       lowestPriorityOffset(0),
@@ -187,7 +190,7 @@ X86ISA::I82094AA::signalInterrupt(int line)
     } else {
         TriggerIntMessage message = 0;
         message.destination = entry.dest;
-        if (entry.deliveryMode == DeliveryMode::ExtInt) {
+        if (entry.deliveryMode == delivery_mode::ExtInt) {
             assert(extIntPic);
             message.vector = extIntPic->getVector();
         } else {
@@ -200,7 +203,7 @@ X86ISA::I82094AA::signalInterrupt(int line)
         std::list<int> apics;
         int numContexts = sys->threads.size();
         if (message.destMode == 0) {
-            if (message.deliveryMode == DeliveryMode::LowestPriority) {
+            if (message.deliveryMode == delivery_mode::LowestPriority) {
                 panic("Lowest priority delivery mode from the "
                         "IO APIC aren't supported in physical "
                         "destination mode.\n");
@@ -222,7 +225,7 @@ X86ISA::I82094AA::signalInterrupt(int line)
                     apics.push_back(localApic->getInitialApicId());
                 }
             }
-            if (message.deliveryMode == DeliveryMode::LowestPriority &&
+            if (message.deliveryMode == delivery_mode::LowestPriority &&
                     apics.size()) {
                 // The manual seems to suggest that the chipset just does
                 // something reasonable for these instead of actually using
@@ -291,3 +294,5 @@ X86ISA::I82094AA::unserialize(CheckpointIn &cp)
         redirTable[i] = (RedirTableEntry)redirTableArray[i];
     }
 }
+
+} // namespace gem5

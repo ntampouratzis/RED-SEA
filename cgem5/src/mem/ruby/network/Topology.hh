@@ -49,6 +49,12 @@
 #include "mem/ruby/network/BasicLink.hh"
 #include "mem/ruby/protocol/LinkDirection.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 class NetDest;
 class Network;
 
@@ -121,5 +127,8 @@ operator<<(std::ostream& out, const Topology& obj)
     out << std::flush;
     return out;
 }
+
+} // namespace ruby
+} // namespace gem5
 
 #endif // __MEM_RUBY_NETWORK_TOPOLOGY_HH__

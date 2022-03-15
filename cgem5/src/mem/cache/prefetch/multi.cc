@@ -39,7 +39,12 @@
 
 #include "params/MultiPrefetcher.hh"
 
-namespace Prefetcher {
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(Prefetcher, prefetch);
+namespace prefetch
+{
 
 Multi::Multi(const MultiPrefetcherParams &p)
   : Base(p),
@@ -72,6 +77,8 @@ Multi::getPacket()
         if (pf->nextPrefetchReadyTime() <= curTick()) {
             PacketPtr pkt = pf->getPacket();
             panic_if(!pkt, "Prefetcher is ready but didn't return a packet.");
+            prefetchStats.pfIssued++;
+            issuedPrefetches++;
             return pkt;
         }
     }
@@ -79,4 +86,5 @@ Multi::getPacket()
     return nullptr;
 }
 
-} // namespace Prefetcher
+} // namespace prefetch
+} // namespace gem5

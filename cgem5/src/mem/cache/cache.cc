@@ -63,6 +63,9 @@
 #include "mem/request.hh"
 #include "params/Cache.hh"
 
+namespace gem5
+{
+
 Cache::Cache(const CacheParams &p)
     : BaseCache(p, p.system->cacheLineSize()),
       doFastWrites(true)
@@ -162,9 +165,9 @@ Cache::access(PacketPtr pkt, CacheBlk *&blk, Cycles &lat,
     if (pkt->req->isUncacheable()) {
         assert(pkt->isRequest());
 
-        chatty_assert(!(isReadOnly && pkt->isWrite()),
-                      "Should never see a write in a read-only cache %s\n",
-                      name());
+        gem5_assert(!(isReadOnly && pkt->isWrite()),
+                    "Should never see a write in a read-only cache %s\n",
+                    name());
 
         DPRINTF(Cache, "%s for %s\n", __func__, pkt->print());
 
@@ -449,7 +452,7 @@ Cache::recvTimingReq(PacketPtr pkt)
         // this express snoop travels towards the memory, and at
         // every crossbar it is snooped upwards thus reaching
         // every cache in the system
-        M5_VAR_USED bool success = memSidePort.sendTimingReq(snoop_pkt);
+        [[maybe_unused]] bool success = memSidePort.sendTimingReq(snoop_pkt);
         // express snoops always succeed
         assert(success);
 
@@ -527,7 +530,7 @@ Cache::createMissPacket(PacketPtr cpu_pkt, CacheBlk *blk,
         // * this cache is mostly exclusive and will not fill (since
         //   it does not fill it will have to writeback the dirty data
         //   immediately which generates uneccesary writebacks).
-        bool force_clean_rsp = isReadOnly || clusivity == Enums::mostly_excl;
+        bool force_clean_rsp = isReadOnly || clusivity == enums::mostly_excl;
         cmd = needsWritable ? MemCmd::ReadExReq :
             (force_clean_rsp ? MemCmd::ReadCleanReq : MemCmd::ReadSharedReq);
     }
@@ -591,9 +594,7 @@ Cache::handleAtomicReqMiss(PacketPtr pkt, CacheBlk *&blk,
     DPRINTF(Cache, "%s: Sending an atomic %s\n", __func__,
             bus_pkt->print());
 
-#if TRACING_ON
     const std::string old_state = blk ? blk->print() : "";
-#endif
 
     Cycles latency = ticksToCycles(memSidePort.sendAtomic(bus_pkt));
 
@@ -994,7 +995,7 @@ Cache::handleSnoop(PacketPtr pkt, CacheBlk *blk, bool is_timing,
     // responds in atomic mode, so remember a few things about the
     // original packet up front
     bool invalidate = pkt->isInvalidate();
-    M5_VAR_USED bool needs_writable = pkt->needsWritable();
+    [[maybe_unused]] bool needs_writable = pkt->needsWritable();
 
     // at the moment we could get an uncacheable write which does not
     // have the invalidate flag, and we need a suitable way of dealing
@@ -1103,7 +1104,7 @@ Cache::handleSnoop(PacketPtr pkt, CacheBlk *blk, bool is_timing,
         // xbar.
         respond = blk->isSet(CacheBlk::DirtyBit) && pkt->needsResponse();
 
-        chatty_assert(!(isReadOnly && blk->isSet(CacheBlk::DirtyBit)),
+        gem5_assert(!(isReadOnly && blk->isSet(CacheBlk::DirtyBit)),
             "Should never have a dirty block in a read-only cache %s\n",
             name());
     }
@@ -1396,7 +1397,7 @@ Cache::sendMSHRQueuePacket(MSHR* mshr)
         // prefetchSquash first may result in the MSHR being
         // prematurely deallocated.
         if (snoop_pkt.cacheResponding()) {
-            M5_VAR_USED auto r = outstandingSnoop.insert(snoop_pkt.req);
+            [[maybe_unused]] auto r = outstandingSnoop.insert(snoop_pkt.req);
             assert(r.second);
 
             // if we are getting a snoop response with no sharers it
@@ -1431,3 +1432,5 @@ Cache::sendMSHRQueuePacket(MSHR* mshr)
 
     return BaseCache::sendMSHRQueuePacket(mshr);
 }
+
+} // namespace gem5

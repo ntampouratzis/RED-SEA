@@ -41,9 +41,12 @@
 #include <set>
 #include <vector>
 
-#include "arch/arm/intregs.hh"
 #include "arch/arm/kvm/base_cpu.hh"
-#include "arch/arm/miscregs.hh"
+#include "arch/arm/regs/int.hh"
+#include "arch/arm/regs/misc.hh"
+
+namespace gem5
+{
 
 struct ArmV8KvmCPUParams;
 
@@ -92,7 +95,8 @@ class ArmV8KvmCPU : public BaseArmKvmCPU
 
   protected:
     /** Mapping between integer registers in gem5 and KVM */
-    struct IntRegInfo {
+    struct IntRegInfo
+    {
         IntRegInfo(uint64_t _kvm, ArmISA::IntRegIndex _idx, const char *_name)
             : kvm(_kvm), idx(_idx), name(_name) {}
 
@@ -105,7 +109,8 @@ class ArmV8KvmCPU : public BaseArmKvmCPU
     };
 
     /** Mapping between misc registers in gem5 and registers in KVM */
-    struct MiscRegInfo {
+    struct MiscRegInfo
+    {
         MiscRegInfo(uint64_t _kvm, ArmISA::MiscRegIndex _idx,
                     const char *_name, bool _is_device = false)
             : kvm(_kvm), idx(_idx), name(_name), is_device(_is_device) {}
@@ -144,5 +149,7 @@ class ArmV8KvmCPU : public BaseArmKvmCPU
     /** Cached mapping between system registers in kvm and misc regs in gem5 */
     mutable std::vector<ArmV8KvmCPU::MiscRegInfo> sysRegMap;
 };
+
+} // namespace gem5
 
 #endif // __ARCH_ARM_KVM_ARMV8_CPU_HH__

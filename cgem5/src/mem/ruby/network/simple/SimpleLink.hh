@@ -37,6 +37,12 @@
 #include "params/SimpleIntLink.hh"
 #include "mem/ruby/network/BasicLink.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 class SimpleExtLink : public BasicExtLink
 {
   public:
@@ -76,5 +82,8 @@ operator<<(std::ostream& out, const SimpleIntLink& obj)
     out << std::flush;
     return out;
 }
+
+} // namespace ruby
+} // namespace gem5
 
 #endif //__MEM_RUBY_NETWORK_SIMPLE_SIMPLELINK_HH__

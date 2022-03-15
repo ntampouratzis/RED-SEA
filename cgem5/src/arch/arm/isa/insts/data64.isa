@@ -83,16 +83,16 @@ let {{
         "logic": '0'
     }
 
-    immOp2 = "M5_VAR_USED uint64_t secOp = imm;"
-    sRegOp2 = "M5_VAR_USED uint64_t secOp = " + \
+    immOp2 = "[[maybe_unused]] uint64_t secOp = imm;"
+    sRegOp2 = "[[maybe_unused]] uint64_t secOp = " + \
               "shiftReg64(Op264, shiftAmt, shiftType, intWidth);"
-    eRegOp2 = "M5_VAR_USED uint64_t secOp = " + \
+    eRegOp2 = "[[maybe_unused]] uint64_t secOp = " + \
               "extendReg64(Op264, extendType, shiftAmt, intWidth);"
 
     def buildDataWork(mnem, code, flagType, suffix, buildCc, buildNonCc,
                       base, templateBase):
         code = '''
-        M5_VAR_USED uint64_t resTemp = 0;
+        [[maybe_unused]] uint64_t resTemp = 0;
         ''' + code
         ccCode = createCcCode64(carryCode64[flagType], overflowCode64[flagType])
         Name = mnem.capitalize() + suffix
@@ -382,7 +382,7 @@ let {{
            Request::Flags memAccessFlags = Request::CACHE_BLOCK_ZERO;
            EA = XBase;
            assert(!(Dczid & 0x10));
-           uint64_t op_size = power(2, Dczid + 2);
+           uint64_t op_size = 1ULL << (Dczid + 2);
            EA &= ~(op_size - 1);
 
    '''
@@ -489,8 +489,8 @@ let {{
            faultAddr = EA;
            HCR hcr = Hcr64;
            SCR scr = Scr64;
-           if (el == EL1 && ArmSystem::haveVirtualization(xc->tcBase()) &&
-               hcr.vm && (scr.ns || !ArmSystem::haveSecurity(xc->tcBase()))) {
+           if (el == EL1 && ArmSystem::haveEL(xc->tcBase(), EL2) &&
+               hcr.vm && (scr.ns || !ArmSystem::haveEL(xc->tcBase(), EL3))) {
                memAccessFlags = memAccessFlags | Request::CLEAN;
            }
            System *sys = xc->tcBase()->getSystemPtr();
@@ -577,9 +577,9 @@ let {{
 
     def condCompCode(flagType, op, imm):
         ccCode = createCcCode64(carryCode64[flagType], overflowCode64[flagType])
-        opDecl = "M5_VAR_USED uint64_t secOp = imm;"
+        opDecl = "[[maybe_unused]] uint64_t secOp = imm;"
         if not imm:
-            opDecl = "M5_VAR_USED uint64_t secOp = Op264;"
+            opDecl = "[[maybe_unused]] uint64_t secOp = Op264;"
         return opDecl + '''
             if (testPredicate(CondCodesNZ, CondCodesC, CondCodesV, condCode)) {
                 uint64_t resTemp = Op164 ''' + op + ''' secOp;

@@ -49,8 +49,14 @@
 #include "mem/mem_interface.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
+namespace memory
+{
+
 MemCtrl::MemCtrl(const MemCtrlParams &p) :
-    QoS::MemCtrl(p),
+    qos::MemCtrl(p),
     port(name() + ".port", *this), isTimingMode(false),
     retryRdReq(false), retryWrReq(false),
     nextReqEvent([this]{ processNextReqEvent(); }, name()),
@@ -234,7 +240,7 @@ MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
                         stats.servicedByWrQ++;
                         pktsServicedByWrQ++;
                         DPRINTF(MemCtrl,
-                                "Read to addr %lld with size %d serviced by "
+                                "Read to addr %#x with size %d serviced by "
                                 "write queue\n",
                                 addr, size);
                         stats.bytesReadWrQ += burst_size;
@@ -250,7 +256,7 @@ MemCtrl::addToReadQueue(PacketPtr pkt, unsigned int pkt_count, bool is_dram)
 
             // Make the burst helper for split packets
             if (pkt_count > 1 && burst_helper == NULL) {
-                DPRINTF(MemCtrl, "Read to addr %lld translates to %d "
+                DPRINTF(MemCtrl, "Read to addr %#x translates to %d "
                         "memory requests\n", pkt->getAddr(), pkt_count);
                 burst_helper = new BurstHelper(pkt_count);
             }
@@ -394,19 +400,19 @@ MemCtrl::printQs() const
     DPRINTF(MemCtrl, "===READ QUEUE===\n\n");
     for (const auto& queue : readQueue) {
         for (const auto& packet : queue) {
-            DPRINTF(MemCtrl, "Read %lu\n", packet->addr);
+            DPRINTF(MemCtrl, "Read %#x\n", packet->addr);
         }
     }
 
     DPRINTF(MemCtrl, "\n===RESP QUEUE===\n\n");
     for (const auto& packet : respQueue) {
-        DPRINTF(MemCtrl, "Response %lu\n", packet->addr);
+        DPRINTF(MemCtrl, "Response %#x\n", packet->addr);
     }
 
     DPRINTF(MemCtrl, "\n===WRITE QUEUE===\n\n");
     for (const auto& queue : writeQueue) {
         for (const auto& packet : queue) {
-            DPRINTF(MemCtrl, "Write %lu\n", packet->addr);
+            DPRINTF(MemCtrl, "Write %#x\n", packet->addr);
         }
     }
 #endif // TRACING_ON
@@ -416,7 +422,7 @@ bool
 MemCtrl::recvTimingReq(PacketPtr pkt)
 {
     // This is where we enter from the outside world
-    DPRINTF(MemCtrl, "recvTimingReq: request %s addr %lld size %d\n",
+    DPRINTF(MemCtrl, "recvTimingReq: request %s addr %#x size %d\n",
             pkt->cmdString(), pkt->getAddr(), pkt->getSize());
 
     panic_if(pkt->cacheResponding(), "Should not see packets where cache "
@@ -520,7 +526,6 @@ MemCtrl::processRespondEvent()
         accessAndRespond(mem_pkt->pkt, frontendLatency + backendLatency);
     }
 
-    delete respQueue.front();
     respQueue.pop_front();
 
     if (!respQueue.empty()) {
@@ -542,6 +547,8 @@ MemCtrl::processRespondEvent()
             dram->checkRefreshState(mem_pkt->rank);
         }
     }
+
+    delete mem_pkt;
 
     // We have made a location in the queue available at this point,
     // so if there is a read that was forced to wait, retry now
@@ -568,7 +575,7 @@ MemCtrl::chooseNext(MemPacketQueue& queue, Tick extra_col_delay)
             } else {
                 DPRINTF(MemCtrl, "Single request, going to a busy rank\n");
             }
-        } else if (memSchedPolicy == Enums::fcfs) {
+        } else if (memSchedPolicy == enums::fcfs) {
             // check if there is a packet going to a free rank
             for (auto i = queue.begin(); i != queue.end(); ++i) {
                 MemPacket* mem_pkt = *i;
@@ -577,7 +584,7 @@ MemCtrl::chooseNext(MemPacketQueue& queue, Tick extra_col_delay)
                     break;
                 }
             }
-        } else if (memSchedPolicy == Enums::frfcfs) {
+        } else if (memSchedPolicy == enums::frfcfs) {
             ret = chooseNextFRFCFS(queue, extra_col_delay);
         } else {
             panic("No scheduling policy chosen\n");
@@ -631,7 +638,7 @@ MemCtrl::chooseNextFRFCFS(MemPacketQueue& queue, Tick extra_col_delay)
 void
 MemCtrl::accessAndRespond(PacketPtr pkt, Tick static_latency)
 {
-    DPRINTF(MemCtrl, "Responding to Address %lld.. \n",pkt->getAddr());
+    DPRINTF(MemCtrl, "Responding to Address %#x.. \n", pkt->getAddr());
 
     bool needsResponse = pkt->needsResponse();
     // do the actual memory access which also turns the packet into a
@@ -837,7 +844,7 @@ MemCtrl::doBurstAccess(MemPacket* mem_pkt)
 
     }
 
-    DPRINTF(MemCtrl, "Access to %lld, ready at %lld next burst at %lld.\n",
+    DPRINTF(MemCtrl, "Access to %#x, ready at %lld next burst at %lld.\n",
             mem_pkt->addr, mem_pkt->readyTime, nextBurstAt);
 
     // Update the minimum timing between the requests, this is a
@@ -1182,99 +1189,105 @@ MemCtrl::burstAlign(Addr addr, bool is_dram) const
 }
 
 MemCtrl::CtrlStats::CtrlStats(MemCtrl &_ctrl)
-    : Stats::Group(&_ctrl),
+    : statistics::Group(&_ctrl),
     ctrl(_ctrl),
 
-    ADD_STAT(readReqs, UNIT_COUNT, "Number of read requests accepted"),
-    ADD_STAT(writeReqs, UNIT_COUNT, "Number of write requests accepted"),
+    ADD_STAT(readReqs, statistics::units::Count::get(),
+             "Number of read requests accepted"),
+    ADD_STAT(writeReqs, statistics::units::Count::get(),
+             "Number of write requests accepted"),
 
-    ADD_STAT(readBursts, UNIT_COUNT,
+    ADD_STAT(readBursts, statistics::units::Count::get(),
              "Number of controller read bursts, including those serviced by "
              "the write queue"),
-    ADD_STAT(writeBursts, UNIT_COUNT,
+    ADD_STAT(writeBursts, statistics::units::Count::get(),
              "Number of controller write bursts, including those merged in "
              "the write queue"),
-    ADD_STAT(servicedByWrQ, UNIT_COUNT,
+    ADD_STAT(servicedByWrQ, statistics::units::Count::get(),
              "Number of controller read bursts serviced by the write queue"),
-    ADD_STAT(mergedWrBursts, UNIT_COUNT,
+    ADD_STAT(mergedWrBursts, statistics::units::Count::get(),
              "Number of controller write bursts merged with an existing one"),
 
-    ADD_STAT(neitherReadNorWriteReqs, UNIT_COUNT,
+    ADD_STAT(neitherReadNorWriteReqs, statistics::units::Count::get(),
              "Number of requests that are neither read nor write"),
 
-    ADD_STAT(avgRdQLen,
-             UNIT_RATE(Stats::Units::Count, Stats::Units::Tick),
+    ADD_STAT(avgRdQLen, statistics::units::Rate<
+                statistics::units::Count, statistics::units::Tick>::get(),
              "Average read queue length when enqueuing"),
-    ADD_STAT(avgWrQLen,
-             UNIT_RATE(Stats::Units::Count, Stats::Units::Tick),
+    ADD_STAT(avgWrQLen, statistics::units::Rate<
+                statistics::units::Count, statistics::units::Tick>::get(),
              "Average write queue length when enqueuing"),
 
-    ADD_STAT(numRdRetry, UNIT_COUNT,
+    ADD_STAT(numRdRetry, statistics::units::Count::get(),
              "Number of times read queue was full causing retry"),
-    ADD_STAT(numWrRetry, UNIT_COUNT,
+    ADD_STAT(numWrRetry, statistics::units::Count::get(),
              "Number of times write queue was full causing retry"),
 
-    ADD_STAT(readPktSize, UNIT_COUNT, "Read request sizes (log2)"),
-    ADD_STAT(writePktSize, UNIT_COUNT, "Write request sizes (log2)"),
+    ADD_STAT(readPktSize, statistics::units::Count::get(),
+             "Read request sizes (log2)"),
+    ADD_STAT(writePktSize, statistics::units::Count::get(),
+             "Write request sizes (log2)"),
 
-    ADD_STAT(rdQLenPdf, UNIT_COUNT,
+    ADD_STAT(rdQLenPdf, statistics::units::Count::get(),
              "What read queue length does an incoming req see"),
-    ADD_STAT(wrQLenPdf, UNIT_COUNT,
+    ADD_STAT(wrQLenPdf, statistics::units::Count::get(),
              "What write queue length does an incoming req see"),
 
-    ADD_STAT(rdPerTurnAround, UNIT_COUNT,
+    ADD_STAT(rdPerTurnAround, statistics::units::Count::get(),
              "Reads before turning the bus around for writes"),
-    ADD_STAT(wrPerTurnAround, UNIT_COUNT,
+    ADD_STAT(wrPerTurnAround, statistics::units::Count::get(),
              "Writes before turning the bus around for reads"),
 
-    ADD_STAT(bytesReadWrQ, UNIT_BYTE,
+    ADD_STAT(bytesReadWrQ, statistics::units::Byte::get(),
              "Total number of bytes read from write queue"),
-    ADD_STAT(bytesReadSys, UNIT_BYTE,
+    ADD_STAT(bytesReadSys, statistics::units::Byte::get(),
              "Total read bytes from the system interface side"),
-    ADD_STAT(bytesWrittenSys, UNIT_BYTE,
+    ADD_STAT(bytesWrittenSys, statistics::units::Byte::get(),
              "Total written bytes from the system interface side"),
 
-    ADD_STAT(avgRdBWSys, UNIT_RATE(Stats::Units::Byte, Stats::Units::Second),
+    ADD_STAT(avgRdBWSys, statistics::units::Rate<
+                statistics::units::Byte, statistics::units::Second>::get(),
              "Average system read bandwidth in Byte/s"),
-    ADD_STAT(avgWrBWSys, UNIT_RATE(Stats::Units::Byte, Stats::Units::Second),
+    ADD_STAT(avgWrBWSys, statistics::units::Rate<
+                statistics::units::Byte, statistics::units::Second>::get(),
              "Average system write bandwidth in Byte/s"),
 
-    ADD_STAT(totGap, UNIT_TICK, "Total gap between requests"),
-    ADD_STAT(avgGap, UNIT_RATE(Stats::Units::Tick, Stats::Units::Count),
+    ADD_STAT(totGap, statistics::units::Tick::get(), "Total gap between requests"),
+    ADD_STAT(avgGap, statistics::units::Rate<
+                statistics::units::Tick, statistics::units::Count>::get(),
              "Average gap between requests"),
 
-    ADD_STAT(requestorReadBytes, UNIT_BYTE,
+    ADD_STAT(requestorReadBytes, statistics::units::Byte::get(),
              "Per-requestor bytes read from memory"),
-    ADD_STAT(requestorWriteBytes, UNIT_BYTE,
+    ADD_STAT(requestorWriteBytes, statistics::units::Byte::get(),
              "Per-requestor bytes write to memory"),
-    ADD_STAT(requestorReadRate,
-             UNIT_RATE(Stats::Units::Byte, Stats::Units::Second),
+    ADD_STAT(requestorReadRate, statistics::units::Rate<
+                statistics::units::Byte, statistics::units::Second>::get(),
              "Per-requestor bytes read from memory rate"),
-    ADD_STAT(requestorWriteRate,
-             UNIT_RATE(Stats::Units::Byte, Stats::Units::Second),
+    ADD_STAT(requestorWriteRate, statistics::units::Rate<
+                statistics::units::Byte, statistics::units::Second>::get(),
              "Per-requestor bytes write to memory rate"),
-    ADD_STAT(requestorReadAccesses, UNIT_COUNT,
+    ADD_STAT(requestorReadAccesses, statistics::units::Count::get(),
              "Per-requestor read serviced memory accesses"),
-    ADD_STAT(requestorWriteAccesses, UNIT_COUNT,
+    ADD_STAT(requestorWriteAccesses, statistics::units::Count::get(),
              "Per-requestor write serviced memory accesses"),
-    ADD_STAT(requestorReadTotalLat, UNIT_TICK,
+    ADD_STAT(requestorReadTotalLat, statistics::units::Tick::get(),
              "Per-requestor read total memory access latency"),
-    ADD_STAT(requestorWriteTotalLat, UNIT_TICK,
+    ADD_STAT(requestorWriteTotalLat, statistics::units::Tick::get(),
              "Per-requestor write total memory access latency"),
-    ADD_STAT(requestorReadAvgLat,
-             UNIT_RATE(Stats::Units::Tick, Stats::Units::Count),
+    ADD_STAT(requestorReadAvgLat, statistics::units::Rate<
+                statistics::units::Tick, statistics::units::Count>::get(),
              "Per-requestor read average memory access latency"),
-    ADD_STAT(requestorWriteAvgLat,
-             UNIT_RATE(Stats::Units::Tick, Stats::Units::Count),
+    ADD_STAT(requestorWriteAvgLat, statistics::units::Rate<
+                statistics::units::Tick, statistics::units::Count>::get(),
              "Per-requestor write average memory access latency")
-
 {
 }
 
 void
 MemCtrl::CtrlStats::regStats()
 {
-    using namespace Stats;
+    using namespace statistics;
 
     assert(ctrl.system());
     const auto max_requestors = ctrl.system()->maxRequestors();
@@ -1386,7 +1399,7 @@ Port &
 MemCtrl::getPort(const std::string &if_name, PortID idx)
 {
     if (if_name != "port") {
-        return QoS::MemCtrl::getPort(if_name, idx);
+        return qos::MemCtrl::getPort(if_name, idx);
     } else {
         return port;
     }
@@ -1503,3 +1516,6 @@ MemCtrl::MemoryPort::recvTimingReq(PacketPtr pkt)
     // pass it to the memory controller
     return ctrl.recvTimingReq(pkt);
 }
+
+} // namespace memory
+} // namespace gem5

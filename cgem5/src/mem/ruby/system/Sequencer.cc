@@ -59,6 +59,12 @@
 #include "mem/ruby/system/RubySystem.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 Sequencer::Sequencer(const Params &p)
     : RubyPort(p), m_IncompleteTimes(MachineType_NUM),
       deadlockCheckEvent([this]{ wakeup(); }, "Sequencer deadlock check")
@@ -85,45 +91,50 @@ Sequencer::Sequencer(const Params &p)
     m_missLatencyHist.init(10);
 
     for (int i = 0; i < RubyRequestType_NUM; i++) {
-        m_typeLatencyHist.push_back(new Stats::Histogram());
+        m_typeLatencyHist.push_back(new statistics::Histogram());
         m_typeLatencyHist[i]->init(10);
 
-        m_hitTypeLatencyHist.push_back(new Stats::Histogram());
+        m_hitTypeLatencyHist.push_back(new statistics::Histogram());
         m_hitTypeLatencyHist[i]->init(10);
 
-        m_missTypeLatencyHist.push_back(new Stats::Histogram());
+        m_missTypeLatencyHist.push_back(new statistics::Histogram());
         m_missTypeLatencyHist[i]->init(10);
     }
 
     for (int i = 0; i < MachineType_NUM; i++) {
-        m_hitMachLatencyHist.push_back(new Stats::Histogram());
+        m_hitMachLatencyHist.push_back(new statistics::Histogram());
         m_hitMachLatencyHist[i]->init(10);
 
-        m_missMachLatencyHist.push_back(new Stats::Histogram());
+        m_missMachLatencyHist.push_back(new statistics::Histogram());
         m_missMachLatencyHist[i]->init(10);
 
-        m_IssueToInitialDelayHist.push_back(new Stats::Histogram());
+        m_IssueToInitialDelayHist.push_back(new statistics::Histogram());
         m_IssueToInitialDelayHist[i]->init(10);
 
-        m_InitialToForwardDelayHist.push_back(new Stats::Histogram());
+        m_InitialToForwardDelayHist.push_back(new statistics::Histogram());
         m_InitialToForwardDelayHist[i]->init(10);
 
-        m_ForwardToFirstResponseDelayHist.push_back(new Stats::Histogram());
+        m_ForwardToFirstResponseDelayHist.push_back(
+            new statistics::Histogram());
         m_ForwardToFirstResponseDelayHist[i]->init(10);
 
-        m_FirstResponseToCompletionDelayHist.push_back(new Stats::Histogram());
+        m_FirstResponseToCompletionDelayHist.push_back(
+            new statistics::Histogram());
         m_FirstResponseToCompletionDelayHist[i]->init(10);
     }
 
     for (int i = 0; i < RubyRequestType_NUM; i++) {
-        m_hitTypeMachLatencyHist.push_back(std::vector<Stats::Histogram *>());
-        m_missTypeMachLatencyHist.push_back(std::vector<Stats::Histogram *>());
+        m_hitTypeMachLatencyHist.push_back(
+            std::vector<statistics::Histogram *>());
+        m_missTypeMachLatencyHist.push_back(
+            std::vector<statistics::Histogram *>());
 
         for (int j = 0; j < MachineType_NUM; j++) {
-            m_hitTypeMachLatencyHist[i].push_back(new Stats::Histogram());
+            m_hitTypeMachLatencyHist[i].push_back(new statistics::Histogram());
             m_hitTypeMachLatencyHist[i][j]->init(10);
 
-            m_missTypeMachLatencyHist[i].push_back(new Stats::Histogram());
+            m_missTypeMachLatencyHist[i].push_back(
+                new statistics::Histogram());
             m_missTypeMachLatencyHist[i][j]->init(10);
         }
     }
@@ -602,6 +613,15 @@ Sequencer::hitCallback(SequencerRequest* srequest, DataBlock& data,
             data.setData(&overwrite_val[0],
                          getOffset(request_address), pkt->getSize());
             DPRINTF(RubySequencer, "swap data %s\n", data);
+        } else if (pkt->isAtomicOp()) {
+            // Set the data in the packet to the old value in the cache
+            pkt->setData(
+                data.getData(getOffset(request_address), pkt->getSize()));
+            DPRINTF(RubySequencer, "AMO original data %s\n", data);
+            // execute AMO operation
+            (*(pkt->getAtomicOp()))(
+                data.getDataMod(getOffset(request_address)));
+            DPRINTF(RubySequencer, "AMO new data %s\n", data);
         } else if (type != RubyRequestType_Store_Conditional || llscSuccess) {
             // Types of stores set the actual data here, apart from
             // failed Store Conditional requests
@@ -714,14 +734,7 @@ Sequencer::makeRequest(PacketPtr pkt)
             } else if (pkt->req->isInstFetch()) {
                 primary_type = secondary_type = RubyRequestType_IFETCH;
             } else {
-                bool storeCheck = false;
-                // only X86 need the store check
-                if (system->getArch() == Arch::X86ISA) {
-                    uint32_t flags = pkt->req->getFlags();
-                    storeCheck = flags &
-                        (X86ISA::StoreCheck << X86ISA::FlagShift);
-                }
-                if (storeCheck) {
+                if (pkt->req->isReadModifyWrite()) {
                     primary_type = RubyRequestType_RMW_Read;
                     secondary_type = RubyRequestType_ST;
                 } else {
@@ -838,3 +851,6 @@ Sequencer::evictionCallback(Addr address)
     llscClearMonitor(address);
     ruby_eviction_callback(address);
 }
+
+} // namespace ruby
+} // namespace gem5

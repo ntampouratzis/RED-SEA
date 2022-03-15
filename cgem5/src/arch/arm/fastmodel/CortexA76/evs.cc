@@ -34,14 +34,18 @@
 #include "sim/core.hh"
 #include "systemc/tlm_bridge/gem5_to_tlm.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 template <class Types>
 void
 ScxEvsCortexA76<Types>::setClkPeriod(Tick clk_period)
 {
-    clockRateControl->set_mul_div(SimClock::Int::s, clk_period);
+    clockRateControl->set_mul_div(sim_clock::as_int::s, clk_period);
 }
 
 template <class Types>
@@ -57,6 +61,13 @@ ScxEvsCortexA76<Types>::setCluster(SimObject *cluster)
 {
     gem5CpuCluster = dynamic_cast<CortexA76Cluster *>(cluster);
     panic_if(!gem5CpuCluster, "Cluster should be of type CortexA76Cluster");
+}
+
+template <class Types>
+void
+ScxEvsCortexA76<Types>::setResetAddr(int core, Addr addr, bool secure)
+{
+    this->rvbaraddr[core]->set_state(0, addr);
 }
 
 template <class Types>
@@ -80,6 +91,8 @@ ScxEvsCortexA76<Types>::ScxEvsCortexA76(
                 new SignalReceiver(csprintf("vcpumntirq[%d]", i)));
         cntpnsirq.emplace_back(
                 new SignalReceiver(csprintf("cntpnsirq[%d]", i)));
+        rvbaraddr.emplace_back(new SignalInitiator<uint64_t>(
+                    csprintf("rvbaraddr[%d]", i).c_str()));
 
         Base::cnthpirq[i].bind(cnthpirq[i]->signal_in);
         Base::cnthvirq[i].bind(cnthvirq[i]->signal_in);
@@ -90,6 +103,7 @@ ScxEvsCortexA76<Types>::ScxEvsCortexA76(
         Base::pmuirq[i].bind(pmuirq[i]->signal_in);
         Base::vcpumntirq[i].bind(vcpumntirq[i]->signal_in);
         Base::cntpnsirq[i].bind(cntpnsirq[i]->signal_in);
+        rvbaraddr[i]->bind(Base::rvbaraddr[i]);
     }
 
     clockRateControl.bind(this->clock_rate_s);
@@ -153,4 +167,5 @@ template class ScxEvsCortexA76<ScxEvsCortexA76x2Types>;
 template class ScxEvsCortexA76<ScxEvsCortexA76x3Types>;
 template class ScxEvsCortexA76<ScxEvsCortexA76x4Types>;
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5

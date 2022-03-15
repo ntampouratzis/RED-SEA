@@ -54,6 +54,9 @@
 #include "params/IdeDisk.hh"
 #include "sim/eventq.hh"
 
+namespace gem5
+{
+
 class ChunkGenerator;
 
 #define DMA_BACKOFF_PERIOD      200
@@ -66,13 +69,15 @@ class ChunkGenerator;
 #define PRD_COUNT_MASK 0xfffe
 #define PRD_EOT_MASK   0x8000
 
-typedef struct PrdEntry {
+struct PrdEntry_t
+{
     uint32_t baseAddr;
     uint16_t byteCount;
     uint16_t endOfTable;
-} PrdEntry_t;
+};
 
-class PrdTableEntry {
+class PrdTableEntry
+{
   public:
     PrdEntry_t entry;
 
@@ -121,21 +126,24 @@ class PrdTableEntry {
 #define DEV0 (0)
 #define DEV1 (1)
 
-typedef struct CommandReg {
+struct CommandReg_t
+{
     uint16_t data;
     uint8_t error;
     uint8_t sec_count;
     uint8_t sec_num;
     uint8_t cyl_low;
     uint8_t cyl_high;
-    union {
+    union
+    {
         uint8_t drive;
         uint8_t head;
     };
     uint8_t command;
-} CommandReg_t;
+};
 
-typedef enum Events {
+enum Events_t
+{
     None = 0,
     Transfer,
     ReadWait,
@@ -143,9 +151,10 @@ typedef enum Events {
     PrdRead,
     DmaRead,
     DmaWrite
-} Events_t;
+};
 
-typedef enum DevAction {
+enum DevAction_t
+{
     ACT_NONE = 0,
     ACT_CMD_WRITE,
     ACT_CMD_COMPLETE,
@@ -161,9 +170,10 @@ typedef enum DevAction {
     ACT_DMA_DONE,
     ACT_SRST_SET,
     ACT_SRST_CLEAR
-} DevAction_t;
+};
 
-typedef enum DevState {
+enum DevState_t
+{
     // Device idle
     Device_Idle_S = 0,
     Device_Idle_SI,
@@ -189,13 +199,14 @@ typedef enum DevState {
     Prepare_Data_Dma,
     Transfer_Data_Dma,
     Device_Dma_Abort
-} DevState_t;
+};
 
-typedef enum DmaState {
+enum DmaState_t
+{
     Dma_Idle = 0,
     Dma_Start,
     Dma_Transfer
-} DmaState_t;
+};
 
 class IdeController;
 
@@ -252,16 +263,16 @@ class IdeDisk : public SimObject
     /** DMA Aborted */
     bool dmaAborted;
 
-    struct IdeDiskStats : public Stats::Group
+    struct IdeDiskStats : public statistics::Group
     {
-        IdeDiskStats(Stats::Group *parent);
+        IdeDiskStats(statistics::Group *parent);
 
-        Stats::Scalar dmaReadFullPages;
-        Stats::Scalar dmaReadBytes;
-        Stats::Scalar dmaReadTxs;
-        Stats::Scalar dmaWriteFullPages;
-        Stats::Scalar dmaWriteBytes;
-        Stats::Scalar dmaWriteTxs;
+        statistics::Scalar dmaReadFullPages;
+        statistics::Scalar dmaReadBytes;
+        statistics::Scalar dmaReadTxs;
+        statistics::Scalar dmaWriteFullPages;
+        statistics::Scalar dmaWriteBytes;
+        statistics::Scalar dmaWriteTxs;
     } ideDiskStats;
 
   public:
@@ -366,5 +377,6 @@ class IdeDisk : public SimObject
     void unserialize(CheckpointIn &cp) override;
 };
 
+} // namespace gem5
 
 #endif // __DEV_STORAGE_IDE_DISK_HH__

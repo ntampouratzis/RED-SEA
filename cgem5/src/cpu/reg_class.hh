@@ -43,13 +43,18 @@
 
 #include <cassert>
 #include <cstddef>
+#include <string>
 
-#include "arch/generic/types.hh"
-#include "arch/registers.hh"
+#include "arch/vecregs.hh"
+#include "base/types.hh"
 #include "config/the_isa.hh"
 
+namespace gem5
+{
+
 /** Enumerate the classes of registers. */
-enum RegClass {
+enum RegClassType
+{
     IntRegClass,        ///< Integer register
     FloatRegClass,      ///< Floating-point register
     /** Vector Register. */
@@ -61,11 +66,44 @@ enum RegClass {
     MiscRegClass        ///< Control (misc) register
 };
 
-/** Number of register classes.
- * This value is not part of the enum, because putting it there makes the
- * compiler complain about unhandled cases in some switch statements.
- */
-const int NumRegClasses = MiscRegClass + 1;
+class RegId;
+
+class RegClassOps
+{
+  public:
+    virtual std::string regName(const RegId &id) const = 0;
+};
+
+class DefaultRegClassOps : public RegClassOps
+{
+  public:
+    std::string regName(const RegId &id) const override;
+};
+
+class RegClass
+{
+  private:
+    size_t _size;
+    const RegIndex _zeroReg;
+
+    static inline DefaultRegClassOps defaultOps;
+    RegClassOps *_ops = &defaultOps;
+
+  public:
+    RegClass(size_t new_size, RegIndex new_zero=-1) :
+        _size(new_size), _zeroReg(new_zero)
+    {}
+    RegClass(size_t new_size, RegClassOps &new_ops, RegIndex new_zero=-1) :
+        RegClass(new_size, new_zero)
+    {
+        _ops = &new_ops;
+    }
+
+    size_t size() const { return _size; }
+    RegIndex zeroReg() const { return _zeroReg; }
+
+    std::string regName(const RegId &id) const { return _ops->regName(id); }
+};
 
 /** Register ID: describe an architectural register with its class and index.
  * This structure is used instead of just the register index to disambiguate
@@ -76,7 +114,7 @@ class RegId
 {
   protected:
     static const char* regClassStrings[];
-    RegClass regClass;
+    RegClassType regClass;
     RegIndex regIdx;
     ElemIndex elemIdx;
     static constexpr size_t Scale = TheISA::NumVecElemPerVecReg;
@@ -87,14 +125,15 @@ class RegId
   public:
     RegId() : RegId(IntRegClass, 0) {}
 
-    RegId(RegClass reg_class, RegIndex reg_idx)
-        : RegId(reg_class, reg_idx, ILLEGAL_ELEM_INDEX) {}
+    RegId(RegClassType reg_class, RegIndex reg_idx)
+        : RegId(reg_class, reg_idx, IllegalElemIndex) {}
 
-    explicit RegId(RegClass reg_class, RegIndex reg_idx, ElemIndex elem_idx)
+    explicit RegId(RegClassType reg_class, RegIndex reg_idx,
+            ElemIndex elem_idx)
         : regClass(reg_class), regIdx(reg_idx), elemIdx(elem_idx),
           numPinnedWrites(0)
     {
-        if (elemIdx == ILLEGAL_ELEM_INDEX) {
+        if (elemIdx == IllegalElemIndex) {
             panic_if(regClass == VecElemClass,
                     "Creating vector physical index w/o element index");
         } else {
@@ -133,48 +172,17 @@ class RegId
         return regClass != MiscRegClass;
     }
 
-    /**
-     * Check if this is the zero register.
-     * Returns true if this register is a zero register (needs to have a
-     * constant zero value throughout the execution).
-     */
-
-    inline bool
-    isZeroReg() const
-    {
-        return regClass == IntRegClass && regIdx == TheISA::ZeroReg;
-    }
-
-    /** @return true if it is an integer physical register. */
-    bool isIntReg() const { return regClass == IntRegClass; }
-
-    /** @return true if it is a floating-point physical register. */
-    bool isFloatReg() const { return regClass == FloatRegClass; }
-
-    /** @Return true if it is a  condition-code physical register. */
-    bool isVecReg() const { return regClass == VecRegClass; }
-
-    /** @Return true if it is a  condition-code physical register. */
-    bool isVecElem() const { return regClass == VecElemClass; }
-
-    /** @Return true if it is a predicate physical register. */
-    bool isVecPredReg() const { return regClass == VecPredRegClass; }
-
-    /** @Return true if it is a  condition-code physical register. */
-    bool isCCReg() const { return regClass == CCRegClass; }
-
-    /** @Return true if it is a  condition-code physical register. */
-    bool isMiscReg() const { return regClass == MiscRegClass; }
+    /** @return true if it is of the specified class. */
+    bool is(RegClassType reg_class) const { return regClass == reg_class; }
 
     /** Index accessors */
     /** @{ */
-    const RegIndex& index() const { return regIdx; }
-    RegIndex& index() { return regIdx; }
+    RegIndex index() const { return regIdx; }
 
     /** Index flattening.
      * Required to be able to use a vector for the register mapping.
      */
-    inline RegIndex
+    RegIndex
     flatIndex() const
     {
         switch (regClass) {
@@ -189,14 +197,13 @@ class RegId
             return Scale * regIdx + elemIdx;
         }
         panic("Trying to flatten a register without class!");
-        return -1;
     }
     /** @} */
 
     /** Elem accessor */
-    const RegIndex& elemIndex() const { return elemIdx; }
+    RegIndex elemIndex() const { return elemIdx; }
     /** Class accessor */
-    const RegClass& classValue() const { return regClass; }
+    RegClassType classValue() const { return regClass; }
     /** Return a const char* with the register class name. */
     const char* className() const { return regClassStrings[regClass]; }
 
@@ -210,12 +217,6 @@ class RegId
     }
 };
 
-/** Physical register index type.
- * Although the Impl might be a better for this, but there are a few classes
- * that need this typedef yet are not templated on the Impl.
- */
-using PhysRegIndex = short int;
-
 /** Physical register ID.
  * Like a register ID but physical. The inheritance is private because the
  * only relationship between this types is functional, and it is done to
@@ -223,7 +224,7 @@ using PhysRegIndex = short int;
 class PhysRegId : private RegId
 {
   private:
-    PhysRegIndex flatIdx;
+    RegIndex flatIdx;
     int numPinnedWritesToComplete;
     bool pinned;
 
@@ -233,15 +234,15 @@ class PhysRegId : private RegId
     {}
 
     /** Scalar PhysRegId constructor. */
-    explicit PhysRegId(RegClass _regClass, PhysRegIndex _regIdx,
-              PhysRegIndex _flatIdx)
+    explicit PhysRegId(RegClassType _regClass, RegIndex _regIdx,
+              RegIndex _flatIdx)
         : RegId(_regClass, _regIdx), flatIdx(_flatIdx),
           numPinnedWritesToComplete(0), pinned(false)
     {}
 
     /** Vector PhysRegId constructor (w/ elemIndex). */
-    explicit PhysRegId(RegClass _regClass, PhysRegIndex _regIdx,
-              ElemIndex elem_idx, PhysRegIndex flat_idx)
+    explicit PhysRegId(RegClassType _regClass, RegIndex _regIdx,
+              ElemIndex elem_idx, RegIndex flat_idx)
         : RegId(_regClass, _regIdx, elem_idx), flatIdx(flat_idx),
           numPinnedWritesToComplete(0), pinned(false)
     {}
@@ -250,9 +251,9 @@ class PhysRegId : private RegId
     /** @{ */
     using RegId::index;
     using RegId::classValue;
-    using RegId::isZeroReg;
     using RegId::className;
     using RegId::elemIndex;
+    using RegId::is;
      /** @} */
     /**
      * Explicit forward methods, to prevent comparisons of PhysRegId with
@@ -278,27 +279,6 @@ class PhysRegId : private RegId
     }
     /** @} */
 
-    /** @return true if it is an integer physical register. */
-    bool isIntPhysReg() const { return isIntReg(); }
-
-    /** @return true if it is a floating-point physical register. */
-    bool isFloatPhysReg() const { return isFloatReg(); }
-
-    /** @Return true if it is a  condition-code physical register. */
-    bool isCCPhysReg() const { return isCCReg(); }
-
-    /** @Return true if it is a vector physical register. */
-    bool isVectorPhysReg() const { return isVecReg(); }
-
-    /** @Return true if it is a vector element physical register. */
-    bool isVectorPhysElem() const { return isVecElem(); }
-
-    /** @return true if it is a vector predicate physical register. */
-    bool isVecPredPhysReg() const { return isVecPredReg(); }
-
-    /** @Return true if it is a  condition-code physical register. */
-    bool isMiscPhysReg() const { return isMiscReg(); }
-
     /**
      * Returns true if this register is always associated to the same
      * architectural register.
@@ -306,12 +286,12 @@ class PhysRegId : private RegId
     bool isFixedMapping() const { return !isRenameable(); }
 
     /** Flat index accessor */
-    const PhysRegIndex& flatIndex() const { return flatIdx; }
+    const RegIndex& flatIndex() const { return flatIdx; }
 
     static PhysRegId
     elemId(PhysRegId* vid, ElemIndex elem)
     {
-        assert(vid->isVectorPhysReg());
+        assert(vid->is(VecRegClass));
         return PhysRegId(VecElemClass, vid->index(), elem);
     }
 
@@ -353,19 +333,22 @@ class PhysRegId : private RegId
 
 using PhysRegIdPtr = PhysRegId*;
 
+} // namespace gem5
+
 namespace std
 {
 template<>
-struct hash<RegId>
+struct hash<gem5::RegId>
 {
     size_t
-    operator()(const RegId& reg_id) const
+    operator()(const gem5::RegId& reg_id) const
     {
         // Extract unique integral values for the effective fields of a RegId.
         const size_t flat_index = static_cast<size_t>(reg_id.flatIndex());
         const size_t class_num = static_cast<size_t>(reg_id.regClass);
 
-        const size_t shifted_class_num = class_num << (sizeof(RegIndex) << 3);
+        const size_t shifted_class_num =
+            class_num << (sizeof(gem5::RegIndex) << 3);
 
         // Concatenate the class_num to the end of the flat_index, in order to
         // maximize information retained.
@@ -374,12 +357,12 @@ struct hash<RegId>
         // If RegIndex is larger than size_t, then class_num will not be
         // considered by this hash function, so we may wish to perform a
         // different operation to include that information in the hash.
-        static_assert(sizeof(RegIndex) < sizeof(size_t),
+        static_assert(sizeof(gem5::RegIndex) < sizeof(size_t),
             "sizeof(RegIndex) should be less than sizeof(size_t)");
 
         return concatenated_hash;
     }
 };
-}
+} // namespace std
 
 #endif // __CPU__REG_CLASS_HH__

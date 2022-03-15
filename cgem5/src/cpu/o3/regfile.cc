@@ -42,18 +42,23 @@
 #include "cpu/o3/regfile.hh"
 
 #include "cpu/o3/free_list.hh"
-#include "arch/generic/types.hh"
-#include "cpu/o3/free_list.hh"
+
+namespace gem5
+{
+
+namespace o3
+{
 
 PhysRegFile::PhysRegFile(unsigned _numPhysicalIntRegs,
                          unsigned _numPhysicalFloatRegs,
                          unsigned _numPhysicalVecRegs,
                          unsigned _numPhysicalVecPredRegs,
                          unsigned _numPhysicalCCRegs,
-                         VecMode vmode)
+                         const BaseISA::RegClasses &regClasses)
     : intRegFile(_numPhysicalIntRegs),
       floatRegFile(_numPhysicalFloatRegs),
       vectorRegFile(_numPhysicalVecRegs),
+      vectorElemRegFile(_numPhysicalVecRegs * TheISA::NumVecElemPerVecReg),
       vecPredRegFile(_numPhysicalVecPredRegs),
       ccRegFile(_numPhysicalCCRegs),
       numPhysicalIntRegs(_numPhysicalIntRegs),
@@ -68,22 +73,17 @@ PhysRegFile::PhysRegFile(unsigned _numPhysicalIntRegs,
                    + _numPhysicalVecRegs
                    + _numPhysicalVecRegs * TheISA::NumVecElemPerVecReg
                    + _numPhysicalVecPredRegs
-                   + _numPhysicalCCRegs),
-      vecMode(vmode)
+                   + _numPhysicalCCRegs)
 {
-    PhysRegIndex phys_reg;
-    PhysRegIndex flat_reg_idx = 0;
+    RegIndex phys_reg;
+    RegIndex flat_reg_idx = 0;
 
-    if (TheISA::NumCCRegs == 0 && _numPhysicalCCRegs != 0) {
-        // Just make this a warning and go ahead and allocate them
-        // anyway, to keep from having to add checks everywhere
-        warn("Non-zero number of physical CC regs specified, even though\n"
-             "    ISA does not use them.\n");
-    }
     // The initial batch of registers are the integer ones
     for (phys_reg = 0; phys_reg < numPhysicalIntRegs; phys_reg++) {
         intRegIds.emplace_back(IntRegClass, phys_reg, flat_reg_idx++);
     }
+
+    zeroReg = RegId(IntRegClass, regClasses.at(IntRegClass).zeroReg());
 
     // The next batch of the registers are the floating-point physical
     // registers; put them onto the floating-point free list.
@@ -121,7 +121,8 @@ PhysRegFile::PhysRegFile(unsigned _numPhysicalIntRegs,
     }
 
     // Misc regs have a fixed mapping but still need PhysRegIds.
-    for (phys_reg = 0; phys_reg < TheISA::NumMiscRegs; phys_reg++) {
+    for (phys_reg = 0; phys_reg < regClasses.at(MiscRegClass).size();
+            phys_reg++) {
         miscRegIds.emplace_back(MiscRegClass, phys_reg, 0);
     }
 }
@@ -158,13 +159,8 @@ PhysRegFile::initFreeList(UnifiedFreeList *freeList)
                     elemIdx].elemIndex() == elemIdx);
         }
     }
-
-    /* depending on the mode we add the vector registers as whole units or
-     * as different elements. */
-    if (vecMode == Enums::Full)
-        freeList->addRegs(vecRegIds.begin(), vecRegIds.end());
-    else
-        freeList->addRegs(vecElemIds.begin(), vecElemIds.end());
+    freeList->addRegs(vecRegIds.begin(), vecRegIds.end());
+    freeList->addRegs(vecElemIds.begin(), vecElemIds.end());
 
     // The next batch of the registers are the predicate physical
     // registers; put them onto the predicate free list.
@@ -182,18 +178,7 @@ PhysRegFile::initFreeList(UnifiedFreeList *freeList)
 }
 
 PhysRegFile::IdRange
-PhysRegFile::getRegElemIds(PhysRegIdPtr reg)
-{
-    panic_if(!reg->isVectorPhysReg(),
-            "Trying to get elems of a %s register", reg->className());
-    auto idx = reg->index();
-    return std::make_pair(
-                vecElemIds.begin() + idx * TheISA::NumVecElemPerVecReg,
-                vecElemIds.begin() + (idx+1) * TheISA::NumVecElemPerVecReg);
-}
-
-PhysRegFile::IdRange
-PhysRegFile::getRegIds(RegClass cls)
+PhysRegFile::getRegIds(RegClassType cls)
 {
     switch (cls)
     {
@@ -227,9 +212,11 @@ PhysRegFile::getTrueId(PhysRegIdPtr reg)
         return &vecElemIds[reg->index() * TheISA::NumVecElemPerVecReg +
             reg->elemIndex()];
     default:
-        panic_if(!reg->isVectorPhysElem(),
+        panic_if(!reg->is(VecElemClass),
             "Trying to get the register of a %s register", reg->className());
     }
     return nullptr;
 }
 
+} // namespace o3
+} // namespace gem5

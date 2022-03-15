@@ -43,7 +43,6 @@
 #include <string>
 
 #include "base/cprintf.hh"
-#include "cpu/intr_control.hh"
 #include "debug/IdeCtrl.hh"
 #include "dev/storage/ide_disk.hh"
 #include "mem/packet.hh"
@@ -55,8 +54,12 @@
 // we open up the entire namespace std
 using std::string;
 
+namespace gem5
+{
+
 // Bus master IDE registers
-enum BMIRegOffset {
+enum BMIRegOffset
+{
     BMICommand = 0x0,
     BMIStatus = 0x2,
     BMIDescTablePtr = 0x4
@@ -446,3 +449,5 @@ IdeController::Channel::unserialize(const std::string &base, CheckpointIn &cp)
     paramIn(cp, base + ".selectBit", selectBit);
     select(selectBit);
 }
+
+} // namespace gem5

@@ -40,6 +40,11 @@
 
 #include "arch/arm/insts/misc64.hh"
 #include "arch/arm/insts/static_inst.hh"
+#include "arch/arm/pcstate.hh"
+#include "cpu/thread_context.hh"
+
+namespace gem5
+{
 
 namespace ArmISA
 {
@@ -61,7 +66,7 @@ class SysDC64 : public MiscRegOp64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MightBeMicro64 : public ArmStaticInst
@@ -72,22 +77,38 @@ class MightBeMicro64 : public ArmStaticInst
     {}
 
     void
-    advancePC(PCState &pcState) const override
+    advancePC(PCStateBase &pcState) const override
     {
+        auto &apc = pcState.as<PCState>();
         if (flags[IsLastMicroop]) {
-            pcState.uEnd();
+            apc.uEnd();
         } else if (flags[IsMicroop]) {
-            pcState.uAdvance();
+            apc.uAdvance();
         } else {
-            pcState.advance();
+            apc.advance();
         }
+    }
+
+    void
+    advancePC(ThreadContext *tc) const override
+    {
+        PCState pc = tc->pcState().as<PCState>();
+        if (flags[IsLastMicroop]) {
+            pc.uEnd();
+        } else if (flags[IsMicroop]) {
+            pc.uAdvance();
+        } else {
+            pc.advance();
+        }
+        tc->pcState(pc);
     }
 };
 
 class Memory64 : public MightBeMicro64
 {
   public:
-    enum AddrMode {
+    enum AddrMode
+    {
         AddrMd_Offset,
         AddrMd_PreIndex,
         AddrMd_PostIndex
@@ -142,7 +163,7 @@ class MemoryImm64 : public Memory64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MemoryDImm64 : public MemoryImm64
@@ -158,7 +179,7 @@ class MemoryDImm64 : public MemoryImm64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MemoryDImmEx64 : public MemoryDImm64
@@ -174,7 +195,7 @@ class MemoryDImmEx64 : public MemoryDImm64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MemoryPreIndex64 : public MemoryImm64
@@ -187,7 +208,7 @@ class MemoryPreIndex64 : public MemoryImm64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MemoryPostIndex64 : public MemoryImm64
@@ -200,7 +221,7 @@ class MemoryPostIndex64 : public MemoryImm64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MemoryReg64 : public Memory64
@@ -219,7 +240,7 @@ class MemoryReg64 : public Memory64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MemoryRaw64 : public Memory64
@@ -231,7 +252,7 @@ class MemoryRaw64 : public Memory64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MemoryEx64 : public Memory64
@@ -246,7 +267,7 @@ class MemoryEx64 : public Memory64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MemoryLiteral64 : public Memory64
@@ -260,7 +281,7 @@ class MemoryLiteral64 : public Memory64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
 class MemoryAtomicPair64 : public Memory64
@@ -280,9 +301,10 @@ class MemoryAtomicPair64 : public Memory64
     {}
 
     std::string generateDisassembly(
-            Addr pc, const Loader::SymbolTable *symtab) const override;
+            Addr pc, const loader::SymbolTable *symtab) const override;
 };
 
-}
+} // namespace ArmISA
+} // namespace gem5
 
 #endif //__ARCH_ARM_INSTS_MEM_HH__

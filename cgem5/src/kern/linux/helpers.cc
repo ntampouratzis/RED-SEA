@@ -37,13 +37,18 @@
 
 #include "kern/linux/helpers.hh"
 
-#include "config/the_isa.hh"
+#include "base/compiler.hh"
 #include "cpu/thread_context.hh"
 #include "mem/port_proxy.hh"
+#include "mem/translating_port_proxy.hh"
 #include "sim/byteswap.hh"
 #include "sim/system.hh"
 
-struct M5_ATTR_PACKED DmesgEntry {
+namespace gem5
+{
+
+struct GEM5_PACKED DmesgEntry
+{
     uint64_t ts_nsec;
     uint16_t len;
     uint16_t text_len;
@@ -88,12 +93,12 @@ dumpDmesgEntry(const uint8_t *base, const uint8_t *end, const ByteOrder bo,
 }
 
 void
-Linux::dumpDmesg(ThreadContext *tc, std::ostream &os)
+linux::dumpDmesg(ThreadContext *tc, std::ostream &os)
 {
     System *system = tc->getSystemPtr();
     const ByteOrder bo = system->getGuestByteOrder();
     const auto &symtab = system->workload->symtab(tc);
-    PortProxy &proxy = tc->getVirtProxy();
+    TranslatingPortProxy proxy(tc);
 
     auto lb = symtab.find("__log_buf");
     auto lb_len = symtab.find("log_buf_len");
@@ -147,3 +152,5 @@ Linux::dumpDmesg(ThreadContext *tc, std::ostream &os)
         cur += ret;
     }
 }
+
+} // namespace gem5

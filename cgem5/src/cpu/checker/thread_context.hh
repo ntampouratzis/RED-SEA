@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2016-2018, 2020 ARM Limited
+ * Copyright (c) 2011-2012, 2016-2018, 2020-2021 Arm Limited
  * Copyright (c) 2013 Advanced Micro Devices, Inc.
  * All rights reserved
  *
@@ -42,12 +42,15 @@
 #ifndef __CPU_CHECKER_THREAD_CONTEXT_HH__
 #define __CPU_CHECKER_THREAD_CONTEXT_HH__
 
-#include "arch/types.hh"
+#include "arch/generic/pcstate.hh"
 #include "config/the_isa.hh"
 #include "cpu/checker/cpu.hh"
 #include "cpu/simple_thread.hh"
 #include "cpu/thread_context.hh"
 #include "debug/Checker.hh"
+
+namespace gem5
+{
 
 namespace TheISA
 {
@@ -84,8 +87,23 @@ class CheckerThreadContext : public ThreadContext
     CheckerCPU *checkerCPU;
 
   public:
-    bool schedule(PCEvent *e) override { return actualTC->schedule(e); }
-    bool remove(PCEvent *e) override { return actualTC->remove(e); }
+    bool
+    schedule(PCEvent *e) override
+    {
+        [[maybe_unused]] bool check_ret = checkerTC->schedule(e);
+        bool actual_ret = actualTC->schedule(e);
+        assert(actual_ret == check_ret);
+        return actual_ret;
+    }
+
+    bool
+    remove(PCEvent *e) override
+    {
+        [[maybe_unused]] bool check_ret = checkerTC->remove(e);
+        bool actual_ret = actualTC->remove(e);
+        assert(actual_ret == check_ret);
+        return actual_ret;
+    }
 
     void
     scheduleInstCountEvent(Event *event, Tick count) override
@@ -137,7 +155,7 @@ class CheckerThreadContext : public ThreadContext
 
     BaseISA *getIsaPtr() override { return actualTC->getIsaPtr(); }
 
-    TheISA::Decoder *
+    InstDecoder *
     getDecoderPtr() override
     {
         return actualTC->getDecoderPtr();
@@ -148,20 +166,6 @@ class CheckerThreadContext : public ThreadContext
     Process *getProcessPtr() override { return actualTC->getProcessPtr(); }
 
     void setProcessPtr(Process *p) override { actualTC->setProcessPtr(p); }
-
-    PortProxy &getPhysProxy() override { return actualTC->getPhysProxy(); }
-
-    PortProxy &
-    getVirtProxy() override
-    {
-        return actualTC->getVirtProxy();
-    }
-
-    void
-    initMemProxies(ThreadContext *tc) override
-    {
-        actualTC->initMemProxies(tc);
-    }
 
     void
     connectMemPorts(ThreadContext *tc)
@@ -249,64 +253,7 @@ class CheckerThreadContext : public ThreadContext
         return actualTC->getWritableVecReg(reg);
     }
 
-    /** Vector Register Lane Interfaces. */
-    /** @{ */
-    /** Reads source vector 8bit operand. */
-    ConstVecLane8
-    readVec8BitLaneReg(const RegId &reg) const override
-    {
-        return actualTC->readVec8BitLaneReg(reg);
-    }
-
-    /** Reads source vector 16bit operand. */
-    ConstVecLane16
-    readVec16BitLaneReg(const RegId &reg) const override
-    {
-        return actualTC->readVec16BitLaneReg(reg);
-    }
-
-    /** Reads source vector 32bit operand. */
-    ConstVecLane32
-    readVec32BitLaneReg(const RegId &reg) const override
-    {
-        return actualTC->readVec32BitLaneReg(reg);
-    }
-
-    /** Reads source vector 64bit operand. */
-    ConstVecLane64
-    readVec64BitLaneReg(const RegId &reg) const override
-    {
-        return actualTC->readVec64BitLaneReg(reg);
-    }
-
-    /** Write a lane of the destination vector register. */
-    virtual void
-    setVecLane(const RegId &reg,
-               const LaneData<LaneSize::Byte> &val) override
-    {
-        return actualTC->setVecLane(reg, val);
-    }
-    virtual void
-    setVecLane(const RegId &reg,
-               const LaneData<LaneSize::TwoByte> &val) override
-    {
-        return actualTC->setVecLane(reg, val);
-    }
-    virtual void
-    setVecLane(const RegId &reg,
-               const LaneData<LaneSize::FourByte> &val) override
-    {
-        return actualTC->setVecLane(reg, val);
-    }
-    virtual void
-    setVecLane(const RegId &reg,
-               const LaneData<LaneSize::EightByte> &val) override
-    {
-        return actualTC->setVecLane(reg, val);
-    }
-    /** @} */
-
-    const TheISA::VecElem &
+    RegVal
     readVecElem(const RegId& reg) const override
     {
         return actualTC->readVecElem(reg);
@@ -352,7 +299,7 @@ class CheckerThreadContext : public ThreadContext
     }
 
     void
-    setVecElem(const RegId& reg, const TheISA::VecElem& val) override
+    setVecElem(const RegId& reg, RegVal val) override
     {
         actualTC->setVecElem(reg, val);
         checkerTC->setVecElem(reg, val);
@@ -374,11 +321,11 @@ class CheckerThreadContext : public ThreadContext
     }
 
     /** Reads this thread's PC state. */
-    TheISA::PCState pcState() const override { return actualTC->pcState(); }
+    const PCStateBase &pcState() const override { return actualTC->pcState(); }
 
     /** Sets this thread's PC state. */
     void
-    pcState(const TheISA::PCState &val) override
+    pcState(const PCStateBase &val) override
     {
         DPRINTF(Checker, "Changing PC to %s, old PC %s\n",
                          val, checkerTC->pcState());
@@ -388,26 +335,10 @@ class CheckerThreadContext : public ThreadContext
     }
 
     void
-    setNPC(Addr val)
-    {
-        checkerTC->setNPC(val);
-        actualTC->setNPC(val);
-    }
-
-    void
-    pcStateNoRecord(const TheISA::PCState &val) override
+    pcStateNoRecord(const PCStateBase &val) override
     {
         return actualTC->pcState(val);
     }
-
-    /** Reads this thread's PC. */
-    Addr instAddr() const override { return actualTC->instAddr(); }
-
-    /** Reads this thread's next PC. */
-    Addr nextInstAddr() const override { return actualTC->nextInstAddr(); }
-
-    /** Reads this thread's next PC. */
-    MicroPC microPC() const override { return actualTC->microPC(); }
 
     RegVal
     readMiscRegNoEffect(RegIndex misc_reg) const override
@@ -457,12 +388,6 @@ class CheckerThreadContext : public ThreadContext
         actualTC->setStCondFailures(sc_failures);
     }
 
-    Counter
-    readFuncExeInst() const override
-    {
-        return actualTC->readFuncExeInst();
-    }
-
     RegVal
     readIntRegFlat(RegIndex idx) const override
     {
@@ -508,7 +433,7 @@ class CheckerThreadContext : public ThreadContext
         actualTC->setVecRegFlat(idx, val);
     }
 
-    const TheISA::VecElem &
+    RegVal
     readVecElemFlat(RegIndex idx, const ElemIndex& elem_idx) const override
     {
         return actualTC->readVecElemFlat(idx, elem_idx);
@@ -516,7 +441,7 @@ class CheckerThreadContext : public ThreadContext
 
     void
     setVecElemFlat(RegIndex idx, const ElemIndex& elem_idx,
-            const TheISA::VecElem& val) override
+            RegVal val) override
     {
         actualTC->setVecElemFlat(idx, elem_idx, val);
     }
@@ -562,7 +487,7 @@ class CheckerThreadContext : public ThreadContext
     BaseHTMCheckpointPtr&
     getHtmCheckpointPtr() override
     {
-        panic("function not implemented");
+        return actualTC->getHtmCheckpointPtr();
     }
 
     void
@@ -572,5 +497,7 @@ class CheckerThreadContext : public ThreadContext
     }
 
 };
+
+} // namespace gem5
 
 #endif // __CPU_CHECKER_EXEC_CONTEXT_HH__

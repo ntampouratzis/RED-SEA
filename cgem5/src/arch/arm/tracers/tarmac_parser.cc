@@ -45,14 +45,20 @@
 
 #include "arch/arm/insts/static_inst.hh"
 #include "arch/arm/mmu.hh"
-#include "config/the_isa.hh"
 #include "cpu/static_inst.hh"
 #include "cpu/thread_context.hh"
 #include "mem/packet.hh"
 #include "mem/port_proxy.hh"
+#include "mem/se_translating_port_proxy.hh"
+#include "mem/translating_port_proxy.hh"
 #include "sim/core.hh"
+#include "sim/cur_tick.hh"
 #include "sim/faults.hh"
+#include "sim/full_system.hh"
 #include "sim/sim_exit.hh"
+
+namespace gem5
+{
 
 using namespace ArmISA;
 
@@ -912,7 +918,7 @@ TarmacParserRecord::TarmacParserRecordEvent::process()
 
         if (!same) {
             if (!mismatch) {
-                TarmacParserRecord::printMismatchHeader(inst, pc);
+                TarmacParserRecord::printMismatchHeader(inst, *pc);
                 mismatch = true;
             }
             outs << "diff> [" << it->repr << "] gem5: 0x" << std::hex;
@@ -945,21 +951,21 @@ TarmacParserRecord::TarmacParserRecordEvent::description() const
 
 void
 TarmacParserRecord::printMismatchHeader(const StaticInstPtr staticInst,
-                                        ArmISA::PCState pc)
+                                        const PCStateBase &pc)
 {
     std::ostream &outs = Trace::output();
     outs << "\nMismatch between gem5 and TARMAC trace @ " << std::dec
          << curTick() << " ticks\n"
          << "[seq_num: " << std::dec << instRecord.seq_num
          << ", opcode: 0x" << std::hex << (staticInst->getEMI() & 0xffffffff)
-         << ", PC: 0x" << pc.pc()
-         << ", disasm: " <<  staticInst->disassemble(pc.pc()) << "]"
+         << ", PC: 0x" << pc.instAddr()
+         << ", disasm: " <<  staticInst->disassemble(pc.instAddr()) << "]"
          << std::endl;
 }
 
 TarmacParserRecord::TarmacParserRecord(Tick _when, ThreadContext *_thread,
                                        const StaticInstPtr _staticInst,
-                                       PCState _pc,
+                                       const PCStateBase &_pc,
                                        TarmacParser& _parent,
                                        const StaticInstPtr _macroStaticInst)
     : TarmacBaseRecord(_when, _thread, _staticInst,
@@ -979,7 +985,7 @@ TarmacParserRecord::dump()
     std::ostream &outs = Trace::output();
 
     uint64_t written_data = 0;
-    unsigned mem_flags = 3 | ArmISA::TLB::AllowUnaligned;
+    unsigned mem_flags = 3 | ArmISA::MMU::AllowUnaligned;
 
     ISetState isetstate;
 
@@ -1002,10 +1008,10 @@ TarmacParserRecord::dump()
 
               case TARMAC_INST:
                 parsingStarted = true;
-                if (pc.instAddr() != instRecord.addr) {
+                if (pc->instAddr() != instRecord.addr) {
                     if (!mismatch)
-                        printMismatchHeader(staticInst, pc);
-                    outs << "diff> [PC] gem5: 0x" << std::hex << pc.instAddr()
+                        printMismatchHeader(staticInst, *pc);
+                    outs << "diff> [PC] gem5: 0x" << std::hex << pc->instAddr()
                          << ", TARMAC: 0x" << instRecord.addr << std::endl;
                     mismatch = true;
                     mismatchOnPcOrOpcode = true;
@@ -1013,7 +1019,7 @@ TarmacParserRecord::dump()
 
                 if (arm_inst->encoding() != instRecord.opcode) {
                     if (!mismatch)
-                        printMismatchHeader(staticInst, pc);
+                        printMismatchHeader(staticInst, *pc);
                     outs << "diff> [opcode] gem5: 0x" << std::hex
                          << arm_inst->encoding()
                          << ", TARMAC: 0x" << instRecord.opcode << std::endl;
@@ -1022,12 +1028,12 @@ TarmacParserRecord::dump()
                 }
 
                 // Set the Instruction set state.
-                isetstate = pcToISetState(pc);
+                isetstate = pcToISetState(*pc);
 
                 if (instRecord.isetstate != isetstate &&
                     isetstate != ISET_UNSUPPORTED) {
                     if (!mismatch)
-                        printMismatchHeader(staticInst, pc);
+                        printMismatchHeader(staticInst, *pc);
                     outs << "diff> [iset_state] gem5: "
                          << iSetStateToStr(isetstate)
                          << ", TARMAC: "
@@ -1048,7 +1054,7 @@ TarmacParserRecord::dump()
                     break;
                 if (written_data != memRecord.data) {
                     if (!mismatch)
-                        printMismatchHeader(staticInst, pc);
+                        printMismatchHeader(staticInst, *pc);
                     outs << "diff> [mem(0x" << std::hex << memRecord.addr
                          << ")] gem5: 0x" << written_data
                          << ", TARMAC: 0x" << memRecord.data
@@ -1067,7 +1073,7 @@ TarmacParserRecord::dump()
         // entries in the TARMAC trace have been parsed
         if (destRegRecords.size()) {
             TarmacParserRecordEvent *event = new TarmacParserRecordEvent(
-                parent, thread, staticInst, pc, mismatch,
+                parent, thread, staticInst, *pc, mismatch,
                 mismatchOnPcOrOpcode);
             mainEventQueue[0]->schedule(event, curTick());
         } else if (mismatchOnPcOrOpcode && (parent.exitOnDiff ||
@@ -1294,7 +1300,7 @@ TarmacParserRecord::readMemNoEffect(Addr addr, uint8_t *data, unsigned size,
                  Request::funcRequestorId);
 
     // Translate to physical address
-    Fault fault = mmu->translateAtomic(req, thread, BaseTLB::Read);
+    Fault fault = mmu->translateAtomic(req, thread, BaseMMU::Read);
 
     // Ignore read if the address falls into the ignored range
     if (parent.ignoredAddrRange.contains(addr))
@@ -1308,7 +1314,8 @@ TarmacParserRecord::readMemNoEffect(Addr addr, uint8_t *data, unsigned size,
             return false;
         // the translating proxy will perform the virtual to physical
         // translation again
-        thread->getVirtProxy().readBlob(addr, data, size);
+        (FullSystem ? TranslatingPortProxy(thread) :
+         SETranslatingPortProxy(thread)).readBlob(addr, data, size);
     } else {
         return false;
     }
@@ -1367,3 +1374,4 @@ TarmacParserRecord::iSetStateToStr(ISetState isetstate) const
 }
 
 } // namespace Trace
+} // namespace gem5

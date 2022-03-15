@@ -41,12 +41,18 @@
 #ifndef __INSTRECORD_HH__
 #define __INSTRECORD_HH__
 
+#include <memory>
+
+#include "arch/generic/pcstate.hh"
 #include "arch/generic/vec_pred_reg.hh"
 #include "arch/generic/vec_reg.hh"
 #include "base/types.hh"
 #include "cpu/inst_seq.hh"
 #include "cpu/static_inst.hh"
 #include "sim/sim_object.hh"
+
+namespace gem5
+{
 
 class ThreadContext;
 
@@ -63,7 +69,7 @@ class InstRecord
     // need to make this ref-counted so it doesn't go away before we
     // dump the record
     StaticInstPtr staticInst;
-    TheISA::PCState pc;
+    std::unique_ptr<PCStateBase> pc;
     StaticInstPtr macroStaticInst;
 
     // The remaining fields are only valid for particular instruction
@@ -91,12 +97,12 @@ class InstRecord
      * @TODO fix this and record all destintations that an instruction writes
      * @see data_status
      */
-    union {
+    union
+    {
         uint64_t as_int;
         double as_double;
-        ::VecRegContainer<TheISA::VecRegSizeBytes>* as_vec;
-        ::VecPredRegContainer<TheISA::VecPredRegSizeBits,
-                              TheISA::VecPredRegHasPackedRepr>* as_pred;
+        TheISA::VecRegContainer* as_vec;
+        TheISA::VecPredRegContainer* as_pred;
     } data;
 
     /** @defgroup fetch_seq
@@ -114,7 +120,8 @@ class InstRecord
     /** @ingroup data
      * What size of data was written?
      */
-    enum DataStatus {
+    enum DataStatus
+    {
         DataInvalid = 0,
         DataInt8 = 1,   // set to equal number of bytes
         DataInt16 = 2,
@@ -151,14 +158,13 @@ class InstRecord
 
   public:
     InstRecord(Tick _when, ThreadContext *_thread,
-               const StaticInstPtr _staticInst,
-               TheISA::PCState _pc,
-               const StaticInstPtr _macroStaticInst = NULL)
-        : when(_when), thread(_thread), staticInst(_staticInst), pc(_pc),
-        macroStaticInst(_macroStaticInst), addr(0), size(0), flags(0),
-        fetch_seq(0), cp_seq(0), data_status(DataInvalid), mem_valid(false),
-        fetch_seq_valid(false), cp_seq_valid(false), predicate(true),
-        faulting(false)
+               const StaticInstPtr _staticInst, const PCStateBase &_pc,
+               const StaticInstPtr _macroStaticInst=nullptr)
+        : when(_when), thread(_thread), staticInst(_staticInst),
+        pc(_pc.clone()), macroStaticInst(_macroStaticInst), addr(0), size(0),
+        flags(0), fetch_seq(0), cp_seq(0), data_status(DataInvalid),
+        mem_valid(false), fetch_seq_valid(false), cp_seq_valid(false),
+        predicate(true), faulting(false)
     { }
 
     virtual ~InstRecord()
@@ -202,18 +208,16 @@ class InstRecord
     void setData(double d) { data.as_double = d; data_status = DataDouble; }
 
     void
-    setData(::VecRegContainer<TheISA::VecRegSizeBytes>& d)
+    setData(TheISA::VecRegContainer& d)
     {
-        data.as_vec = new ::VecRegContainer<TheISA::VecRegSizeBytes>(d);
+        data.as_vec = new TheISA::VecRegContainer(d);
         data_status = DataVec;
     }
 
     void
-    setData(::VecPredRegContainer<TheISA::VecPredRegSizeBits,
-                                  TheISA::VecPredRegHasPackedRepr>& d)
+    setData(TheISA::VecPredRegContainer& d)
     {
-        data.as_pred = new ::VecPredRegContainer<
-            TheISA::VecPredRegSizeBits, TheISA::VecPredRegHasPackedRepr>(d);
+        data.as_pred = new TheISA::VecPredRegContainer(d);
         data_status = DataVecPred;
     }
 
@@ -233,7 +237,7 @@ class InstRecord
     Tick getWhen() const { return when; }
     ThreadContext *getThread() const { return thread; }
     StaticInstPtr getStaticInst() const { return staticInst; }
-    TheISA::PCState getPCState() const { return pc; }
+    const PCStateBase &getPCState() const { return *pc; }
     StaticInstPtr getMacroStaticInst() const { return macroStaticInst; }
 
     Addr getAddr() const { return addr; }
@@ -265,12 +269,11 @@ class InstTracer : public SimObject
 
     virtual InstRecord *
         getInstRecord(Tick when, ThreadContext *tc,
-                const StaticInstPtr staticInst, TheISA::PCState pc,
-                const StaticInstPtr macroStaticInst = NULL) = 0;
+                const StaticInstPtr staticInst, const PCStateBase &pc,
+                const StaticInstPtr macroStaticInst=nullptr) = 0;
 };
 
-
-
 } // namespace Trace
+} // namespace gem5
 
 #endif // __INSTRECORD_HH__

@@ -45,7 +45,7 @@
 #include <vector>
 
 #include "arch/x86/fs_workload.hh"
-#include "arch/x86/isa_traits.hh"
+#include "arch/x86/page_size.hh"
 #include "arch/x86/regs/misc.hh"
 #include "arch/x86/regs/segment.hh"
 #include "arch/x86/se_workload.hh"
@@ -60,10 +60,14 @@
 #include "mem/page_table.hh"
 #include "params/Process.hh"
 #include "sim/aux_vector.hh"
+#include "sim/byteswap.hh"
 #include "sim/process_impl.hh"
 #include "sim/syscall_desc.hh"
 #include "sim/syscall_return.hh"
 #include "sim/system.hh"
+
+namespace gem5
+{
 
 using namespace X86ISA;
 
@@ -77,7 +81,7 @@ typedef MultiLevelPageTable<LongModePTE<47, 39>,
                             LongModePTE<20, 12> > ArchPageTable;
 
 X86Process::X86Process(const ProcessParams &params,
-                       ::Loader::ObjectFile *objFile) :
+                       loader::ObjectFile *objFile) :
     Process(params, params.useArchPT ?
                     static_cast<EmulationPageTable *>(
                             new ArchPageTable(params.name, params.pid,
@@ -97,7 +101,7 @@ void X86Process::clone(ThreadContext *old_tc, ThreadContext *new_tc,
 }
 
 X86_64Process::X86_64Process(const ProcessParams &params,
-                             ::Loader::ObjectFile *objFile) :
+                             loader::ObjectFile *objFile) :
     X86Process(params, objFile)
 {
     vsyscallPage.base = 0xffffffffff600000ULL;
@@ -118,13 +122,13 @@ X86_64Process::X86_64Process(const ProcessParams &params,
 
 
 I386Process::I386Process(const ProcessParams &params,
-                         ::Loader::ObjectFile *objFile) :
+                         loader::ObjectFile *objFile) :
     X86Process(params, objFile)
 {
     if (kvmInSE)
         panic("KVM CPU model does not support 32 bit processes");
 
-    _gdtStart = ULL(0xffffd000);
+    _gdtStart = 0xffffd000ULL;
     _gdtSize = PageBytes;
 
     vsyscallPage.base = 0xffffe000ULL;
@@ -175,12 +179,12 @@ X86_64Process::initState()
     if (kvmInSE) {
         PortProxy physProxy = system->physProxy;
 
-        Addr syscallCodePhysAddr = system->allocPhysPages(1);
-        Addr gdtPhysAddr = system->allocPhysPages(1);
-        Addr idtPhysAddr = system->allocPhysPages(1);
-        Addr istPhysAddr = system->allocPhysPages(1);
-        Addr tssPhysAddr = system->allocPhysPages(1);
-        Addr pfHandlerPhysAddr = system->allocPhysPages(1);
+        Addr syscallCodePhysAddr = seWorkload->allocPhysPages(1);
+        Addr gdtPhysAddr = seWorkload->allocPhysPages(1);
+        Addr idtPhysAddr = seWorkload->allocPhysPages(1);
+        Addr istPhysAddr = seWorkload->allocPhysPages(1);
+        Addr tssPhysAddr = seWorkload->allocPhysPages(1);
+        Addr pfHandlerPhysAddr = seWorkload->allocPhysPages(1);
 
         /*
          * Set up the gdt.
@@ -279,7 +283,8 @@ X86_64Process::initState()
         TSShigh TSSDescHigh = 0;
         TSSDescHigh.base = bits(TSSVirtAddr, 63, 32);
 
-        struct TSSDesc {
+        struct TSSDesc
+        {
             uint64_t low;
             uint64_t high;
         } tssDescVal = {TSSDescLow, TSSDescHigh};
@@ -410,7 +415,8 @@ X86_64Process::initState()
 
         /* Set up the content of the TSS and write it to physical memory. */
 
-        struct {
+        struct
+        {
             uint32_t reserved0;        // +00h
             uint32_t RSP0_low;         // +04h
             uint32_t RSP0_high;        // +08h
@@ -465,7 +471,8 @@ X86_64Process::initState()
         GateDescriptorHigh PFGateHigh = 0;
         PFGateHigh.offset = bits(PFHandlerVirtAddr, 63, 32);
 
-        struct {
+        struct
+        {
             uint64_t low;
             uint64_t high;
         } PFGate = {PFGateLow, PFGateHigh};
@@ -707,11 +714,11 @@ I386Process::initState()
 template<class IntType>
 void
 X86Process::argsInit(int pageSize,
-                     std::vector<AuxVector<IntType> > extraAuxvs)
+                     std::vector<gem5::auxv::AuxVector<IntType>> extraAuxvs)
 {
     int intSize = sizeof(IntType);
 
-    std::vector<AuxVector<IntType>> auxv = extraAuxvs;
+    std::vector<gem5::auxv::AuxVector<IntType>> auxv = extraAuxvs;
 
     std::string filename;
     if (argv.size() < 1)
@@ -722,7 +729,8 @@ X86Process::argsInit(int pageSize,
     // We want 16 byte alignment
     uint64_t align = 16;
 
-    enum X86CpuFeature {
+    enum X86CpuFeature
+    {
         X86_OnboardFPU = 1 << 0,
         X86_VirtualModeExtensions = 1 << 1,
         X86_DebuggingExtensions = 1 << 2,
@@ -765,7 +773,7 @@ X86Process::argsInit(int pageSize,
     // conversion. Auxiliary vectors are loaded only for elf formatted
     // executables; the auxv is responsible for passing information from
     // the OS to the interpreter.
-    auto *elfObject = dynamic_cast<::Loader::ElfObject *>(objFile);
+    auto *elfObject = dynamic_cast<loader::ElfObject *>(objFile);
     if (elfObject) {
         uint64_t features =
             X86_OnboardFPU |
@@ -801,40 +809,40 @@ X86Process::argsInit(int pageSize,
 
         // Bits which describe the system hardware capabilities
         // XXX Figure out what these should be
-        auxv.emplace_back(M5_AT_HWCAP, features);
+        auxv.emplace_back(gem5::auxv::Hwcap, features);
         // The system page size
-        auxv.emplace_back(M5_AT_PAGESZ, X86ISA::PageBytes);
+        auxv.emplace_back(gem5::auxv::Pagesz, X86ISA::PageBytes);
         // Frequency at which times() increments
         // Defined to be 100 in the kernel source.
-        auxv.emplace_back(M5_AT_CLKTCK, 100);
+        auxv.emplace_back(gem5::auxv::Clktck, 100);
         // This is the virtual address of the program header tables if they
         // appear in the executable image.
-        auxv.emplace_back(M5_AT_PHDR, elfObject->programHeaderTable());
+        auxv.emplace_back(gem5::auxv::Phdr, elfObject->programHeaderTable());
         // This is the size of a program header entry from the elf file.
-        auxv.emplace_back(M5_AT_PHENT, elfObject->programHeaderSize());
+        auxv.emplace_back(gem5::auxv::Phent, elfObject->programHeaderSize());
         // This is the number of program headers from the original elf file.
-        auxv.emplace_back(M5_AT_PHNUM, elfObject->programHeaderCount());
+        auxv.emplace_back(gem5::auxv::Phnum, elfObject->programHeaderCount());
         // This is the base address of the ELF interpreter; it should be
         // zero for static executables or contain the base address for
         // dynamic executables.
-        auxv.emplace_back(M5_AT_BASE, getBias());
+        auxv.emplace_back(gem5::auxv::Base, getBias());
         // XXX Figure out what this should be.
-        auxv.emplace_back(M5_AT_FLAGS, 0);
+        auxv.emplace_back(gem5::auxv::Flags, 0);
         // The entry point to the program
-        auxv.emplace_back(M5_AT_ENTRY, objFile->entryPoint());
+        auxv.emplace_back(gem5::auxv::Entry, objFile->entryPoint());
         // Different user and group IDs
-        auxv.emplace_back(M5_AT_UID, uid());
-        auxv.emplace_back(M5_AT_EUID, euid());
-        auxv.emplace_back(M5_AT_GID, gid());
-        auxv.emplace_back(M5_AT_EGID, egid());
+        auxv.emplace_back(gem5::auxv::Uid, uid());
+        auxv.emplace_back(gem5::auxv::Euid, euid());
+        auxv.emplace_back(gem5::auxv::Gid, gid());
+        auxv.emplace_back(gem5::auxv::Egid, egid());
         // Whether to enable "secure mode" in the executable
-        auxv.emplace_back(M5_AT_SECURE, 0);
+        auxv.emplace_back(gem5::auxv::Secure, 0);
         // The address of 16 "random" bytes.
-        auxv.emplace_back(M5_AT_RANDOM, 0);
+        auxv.emplace_back(gem5::auxv::Random, 0);
         // The name of the program
-        auxv.emplace_back(M5_AT_EXECFN, 0);
+        auxv.emplace_back(gem5::auxv::Execfn, 0);
         // The platform string
-        auxv.emplace_back(M5_AT_PLATFORM, 0);
+        auxv.emplace_back(gem5::auxv::Platform, 0);
     }
 
     // Figure out how big the initial stack needs to be
@@ -948,22 +956,22 @@ X86Process::argsInit(int pageSize,
     initVirtMem->writeString(file_name_base, filename.c_str());
 
     // Fix up the aux vectors which point to data
-    assert(auxv[auxv.size() - 3].type == M5_AT_RANDOM);
+    assert(auxv[auxv.size() - 3].type == gem5::auxv::Random);
     auxv[auxv.size() - 3].val = aux_data_base;
-    assert(auxv[auxv.size() - 2].type == M5_AT_EXECFN);
+    assert(auxv[auxv.size() - 2].type == gem5::auxv::Execfn);
     auxv[auxv.size() - 2].val = argv_array_base;
-    assert(auxv[auxv.size() - 1].type == M5_AT_PLATFORM);
+    assert(auxv[auxv.size() - 1].type == gem5::auxv::Platform);
     auxv[auxv.size() - 1].val = aux_data_base + numRandomBytes;
 
 
     // Copy the aux stuff
     Addr auxv_array_end = auxv_array_base;
     for (const auto &aux: auxv) {
-        initVirtMem->write(auxv_array_end, aux, GuestByteOrder);
+        initVirtMem->write(auxv_array_end, aux, ByteOrder::little);
         auxv_array_end += sizeof(aux);
     }
     // Write out the terminating zeroed auxiliary vector
-    const AuxVector<uint64_t> zero(0, 0);
+    const gem5::auxv::AuxVector<uint64_t> zero(0, 0);
     initVirtMem->write(auxv_array_end, zero);
     auxv_array_end += sizeof(zero);
 
@@ -978,7 +986,7 @@ X86Process::argsInit(int pageSize,
 
     ThreadContext *tc = system->threads[contextIds[0]];
     // Set the stack pointer register
-    tc->setIntReg(StackPointerReg, stack_min);
+    tc->setIntReg(INTREG_RSP, stack_min);
 
     // There doesn't need to be any segment base added in since we're dealing
     // with the flat segmentation model.
@@ -991,19 +999,19 @@ X86Process::argsInit(int pageSize,
 void
 X86_64Process::argsInit(int pageSize)
 {
-    std::vector<AuxVector<uint64_t> > extraAuxvs;
-    extraAuxvs.emplace_back(M5_AT_SYSINFO_EHDR, vsyscallPage.base);
+    std::vector<gem5::auxv::AuxVector<uint64_t> > extraAuxvs;
+    extraAuxvs.emplace_back(auxv::SysinfoEhdr, vsyscallPage.base);
     X86Process::argsInit<uint64_t>(pageSize, extraAuxvs);
 }
 
 void
 I386Process::argsInit(int pageSize)
 {
-    std::vector<AuxVector<uint32_t> > extraAuxvs;
+    std::vector<gem5::auxv::AuxVector<uint32_t> > extraAuxvs;
     //Tell the binary where the vsyscall part of the vsyscall page is.
-    extraAuxvs.emplace_back(M5_AT_SYSINFO,
+    extraAuxvs.emplace_back(auxv::Sysinfo,
             vsyscallPage.base + vsyscallPage.vsyscallOffset);
-    extraAuxvs.emplace_back(M5_AT_SYSINFO_EHDR, vsyscallPage.base);
+    extraAuxvs.emplace_back(auxv::SysinfoEhdr, vsyscallPage.base);
     X86Process::argsInit<uint32_t>(pageSize, extraAuxvs);
 }
 
@@ -1022,3 +1030,5 @@ I386Process::clone(ThreadContext *old_tc, ThreadContext *new_tc,
     X86Process::clone(old_tc, new_tc, p, flags);
     ((I386Process*)p)->vsyscallPage = vsyscallPage;
 }
+
+} // namespace gem5

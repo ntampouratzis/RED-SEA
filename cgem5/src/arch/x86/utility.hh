@@ -42,27 +42,11 @@
 #include "cpu/thread_context.hh"
 #include "sim/full_system.hh"
 
-namespace X86ISA
+namespace gem5
 {
 
-    inline PCState
-    buildRetPC(const PCState &curPC, const PCState &callPC)
-    {
-        PCState retPC = callPC;
-        retPC.uEnd();
-        return retPC;
-    }
-
-    void copyRegs(ThreadContext *src, ThreadContext *dest);
-
-    void copyMiscRegs(ThreadContext *src, ThreadContext *dest);
-
-    inline void
-    advancePC(PCState &pc, const StaticInstPtr &inst)
-    {
-        inst->advancePC(pc);
-    }
-
+namespace X86ISA
+{
     /**
      * Reconstruct the rflags register from the internal gem5 register
      * state.
@@ -153,6 +137,8 @@ namespace X86ISA
      * @param value Double precision float to store.
      */
     void storeFloat80(void *mem, double value);
-}
+
+} // namespace X86ISA
+} // namespace gem5
 
 #endif // __ARCH_X86_UTILITY_HH__

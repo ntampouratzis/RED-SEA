@@ -40,50 +40,19 @@
 
 #include "arch/x86/interrupts.hh"
 #include "arch/x86/mmu.hh"
-#include "arch/x86/registers.hh"
+#include "arch/x86/regs/ccr.hh"
+#include "arch/x86/regs/float.hh"
+#include "arch/x86/regs/int.hh"
+#include "arch/x86/regs/misc.hh"
 #include "arch/x86/x86_traits.hh"
 #include "cpu/base.hh"
 #include "fputils/fp80.h"
-#include "sim/full_system.hh"
+
+namespace gem5
+{
 
 namespace X86ISA
 {
-
-void
-copyMiscRegs(ThreadContext *src, ThreadContext *dest)
-{
-    // This function assumes no side effects other than TLB invalidation
-    // need to be considered while copying state. That will likely not be
-    // true in the future.
-    for (int i = 0; i < NUM_MISCREGS; ++i) {
-        if (!isValidMiscReg(i))
-             continue;
-
-        dest->setMiscRegNoEffect(i, src->readMiscRegNoEffect(i));
-    }
-
-    // The TSC has to be updated with side-effects if the CPUs in a
-    // CPU switch have different frequencies.
-    dest->setMiscReg(MISCREG_TSC, src->readMiscReg(MISCREG_TSC));
-
-    dest->getMMUPtr()->flushAll();
-}
-
-void
-copyRegs(ThreadContext *src, ThreadContext *dest)
-{
-    //copy int regs
-    for (int i = 0; i < NumIntRegs; ++i)
-         dest->setIntRegFlat(i, src->readIntRegFlat(i));
-    //copy float regs
-    for (int i = 0; i < NumFloatRegs; ++i)
-         dest->setFloatRegFlat(i, src->readFloatRegFlat(i));
-    //copy condition-code regs
-    for (int i = 0; i < NumCCRegs; ++i)
-         dest->setCCRegFlat(i, src->readCCRegFlat(i));
-    copyMiscRegs(src, dest);
-    dest->pcState(src->pcState());
-}
 
 uint64_t
 getRFlags(ThreadContext *tc)
@@ -200,3 +169,4 @@ storeFloat80(void *_mem, double value)
 }
 
 } // namespace X86_ISA
+} // namespace gem5

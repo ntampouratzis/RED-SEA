@@ -43,7 +43,11 @@
 #include "systemc/ext/core/sc_module_name.hh"
 #include "systemc/sc_port_wrapper.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 // The fast model exports a class called scx_evs_GIC which represents
@@ -80,6 +84,7 @@ class SCGIC : public scx_evs_GIC
     };
 
     std::unique_ptr<Terminator> terminator;
+    const SCFastModelGICParams &_params;
 
   public:
     SCGIC(const SCFastModelGICParams &p) : SCGIC(p, p.name.c_str()) {}
@@ -135,6 +140,7 @@ class GIC : public BaseGic
     Tick write(PacketPtr pkt) override { return 0; }
 };
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5
 
 #endif // __ARCH_ARM_FASTMODEL_GIC_GIC_HH__

@@ -43,31 +43,33 @@
 #define __CPU_STATIC_INST_HH__
 
 #include <bitset>
+#include <cstdint>
 #include <memory>
 #include <string>
 
-#include "arch/registers.hh"
-#include "arch/types.hh"
+#include "arch/generic/pcstate.hh"
 #include "base/logging.hh"
 #include "base/refcnt.hh"
-#include "base/types.hh"
-#include "config/the_isa.hh"
 #include "cpu/op_class.hh"
 #include "cpu/reg_class.hh"
 #include "cpu/static_inst_fwd.hh"
-#include "cpu/thread_context.hh"
 #include "enums/StaticInstFlags.hh"
 #include "sim/byteswap.hh"
+
+namespace gem5
+{
 
 // forward declarations
 class Packet;
 
 class ExecContext;
+class ThreadContext;
 
-namespace Loader
+GEM5_DEPRECATED_NAMESPACE(Loader, loader);
+namespace loader
 {
 class SymbolTable;
-} // namespace Loader
+} // namespace loader
 
 namespace Trace
 {
@@ -103,24 +105,24 @@ class StaticInst : public RefCounted, public StaticInstFlags
     OpClass _opClass;
 
     /// See numSrcRegs().
-    int8_t _numSrcRegs;
+    int8_t _numSrcRegs = 0;
 
     /// See numDestRegs().
-    int8_t _numDestRegs;
+    int8_t _numDestRegs = 0;
 
     /// The following are used to track physical register usage
     /// for machines with separate int & FP reg files.
     //@{
-    int8_t _numFPDestRegs;
-    int8_t _numIntDestRegs;
-    int8_t _numCCDestRegs;
+    int8_t _numFPDestRegs = 0;
+    int8_t _numIntDestRegs = 0;
+    int8_t _numCCDestRegs = 0;
     //@}
 
     /** To use in architectures with vector register file. */
     /** @{ */
-    int8_t _numVecDestRegs;
-    int8_t _numVecElemDestRegs;
-    int8_t _numVecPredDestRegs;
+    int8_t _numVecDestRegs = 0;
+    int8_t _numVecElemDestRegs = 0;
+    int8_t _numVecPredDestRegs = 0;
     /** @} */
 
   public:
@@ -226,7 +228,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
     void setFlag(Flags f) { flags[f] = true; }
 
     /// Operation class.  Used to select appropriate function unit in issue.
-    OpClass opClass()     const { return _opClass; }
+    OpClass opClass() const { return _opClass; }
 
 
     /// Return logical index (architectural reg num) of i'th destination reg.
@@ -251,12 +253,6 @@ class StaticInst : public RefCounted, public StaticInstFlags
 
     /// Pointer to a statically allocated "null" instruction object.
     static StaticInstPtr nullStaticInstPtr;
-
-    /// Pointer to a statically allocated generic "nop" instruction object.
-    static StaticInstPtr nopStaticInstPtr;
-
-    /// The binary machine instruction.
-    const TheISA::ExtMachInst machInst;
 
     virtual uint64_t getEMI() const { return 0; }
 
@@ -287,47 +283,50 @@ class StaticInst : public RefCounted, public StaticInstFlags
      * String representation of disassembly (lazily evaluated via
      * disassemble()).
      */
-    mutable std::string *cachedDisassembly;
+    mutable std::unique_ptr<std::string> cachedDisassembly;
 
     /**
      * Internal function to generate disassembly string.
      */
-    virtual std::string
-    generateDisassembly(Addr pc, const Loader::SymbolTable *symtab) const = 0;
+    virtual std::string generateDisassembly(
+            Addr pc, const loader::SymbolTable *symtab) const = 0;
 
     /// Constructor.
     /// It's important to initialize everything here to a sane
     /// default, since the decoder generally only overrides
     /// the fields that are meaningful for the particular
     /// instruction.
-    StaticInst(const char *_mnemonic, TheISA::ExtMachInst _machInst,
-            OpClass __opClass)
-        : _opClass(__opClass),
-          _numSrcRegs(0), _numDestRegs(0), _numFPDestRegs(0),
-          _numIntDestRegs(0), _numCCDestRegs(0), _numVecDestRegs(0),
-          _numVecElemDestRegs(0), _numVecPredDestRegs(0), machInst(_machInst),
-          mnemonic(_mnemonic), cachedDisassembly(0)
-    { }
+    StaticInst(const char *_mnemonic, OpClass op_class)
+        : _opClass(op_class), mnemonic(_mnemonic)
+    {}
 
   public:
-    virtual ~StaticInst();
+    virtual ~StaticInst() {};
 
     virtual Fault execute(ExecContext *xc,
-                          Trace::InstRecord *traceData) const = 0;
+            Trace::InstRecord *traceData) const = 0;
 
-    virtual Fault initiateAcc(ExecContext *xc,
-                              Trace::InstRecord *traceData) const
+    virtual Fault
+    initiateAcc(ExecContext *xc, Trace::InstRecord *traceData) const
     {
         panic("initiateAcc not defined!");
     }
 
-    virtual Fault completeAcc(Packet *pkt, ExecContext *xc,
-                              Trace::InstRecord *traceData) const
+    virtual Fault
+    completeAcc(Packet *pkt, ExecContext *xc,
+            Trace::InstRecord *trace_data) const
     {
         panic("completeAcc not defined!");
     }
 
-    virtual void advancePC(TheISA::PCState &pcState) const = 0;
+    virtual void advancePC(PCStateBase &pc_state) const = 0;
+    virtual void advancePC(ThreadContext *tc) const;
+
+    virtual std::unique_ptr<PCStateBase>
+    buildRetPC(const PCStateBase &cur_pc, const PCStateBase &call_pc) const
+    {
+        panic("buildRetPC not defined!");
+    }
 
     /**
      * Return the microop that goes with a particular micropc. This should
@@ -340,7 +339,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
      * Invalid if not a PC-relative branch (i.e. isDirectCtrl()
      * should be true).
      */
-    virtual TheISA::PCState branchTarget(const TheISA::PCState &pc) const;
+    virtual std::unique_ptr<PCStateBase> branchTarget(
+            const PCStateBase &pc) const;
 
     /**
      * Return the target address for an indirect branch (jump).  The
@@ -349,14 +349,8 @@ class StaticInst : public RefCounted, public StaticInstFlags
      * execute the branch in question.  Invalid if not an indirect
      * branch (i.e. isIndirectCtrl() should be true).
      */
-    virtual TheISA::PCState branchTarget(ThreadContext *tc) const;
-
-    /**
-     * Return true if the instruction is a control transfer, and if so,
-     * return the target address as well.
-     */
-    bool hasBranchTarget(const TheISA::PCState &pc, ThreadContext *tc,
-                         TheISA::PCState &tgt) const;
+    virtual std::unique_ptr<PCStateBase> branchTarget(
+            ThreadContext *tc) const;
 
     /**
      * Return string representation of disassembled instruction.
@@ -366,7 +360,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
      * should not be cached, this function should be overridden directly.
      */
     virtual const std::string &disassemble(Addr pc,
-        const Loader::SymbolTable *symtab=nullptr) const;
+        const loader::SymbolTable *symtab=nullptr) const;
 
     /**
      * Print a separator separated list of this instruction's set flag
@@ -402,5 +396,7 @@ class StaticInst : public RefCounted, public StaticInstFlags
      */
     virtual size_t asBytes(void *buf, size_t max_size) { return 0; }
 };
+
+} // namespace gem5
 
 #endif // __CPU_STATIC_INST_HH__

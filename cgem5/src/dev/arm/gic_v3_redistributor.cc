@@ -41,9 +41,13 @@
 #include "dev/arm/gic_v3_redistributor.hh"
 
 #include "arch/arm/utility.hh"
+#include "base/compiler.hh"
 #include "debug/GIC.hh"
 #include "dev/arm/gic_v3_cpu_interface.hh"
 #include "dev/arm/gic_v3_distributor.hh"
+
+namespace gem5
+{
 
 using namespace ArmISA;
 
@@ -988,7 +992,7 @@ Gicv3Redistributor::getIntGroup(int int_id) const
         }
     }
 
-    M5_UNREACHABLE;
+    GEM5_UNREACHABLE;
 }
 
 void
@@ -1092,3 +1096,5 @@ Gicv3Redistributor::unserialize(CheckpointIn & cp)
     UNSERIALIZE_SCALAR(lpiIDBits);
     UNSERIALIZE_SCALAR(lpiPendingTablePtr);
 }
+
+} // namespace gem5

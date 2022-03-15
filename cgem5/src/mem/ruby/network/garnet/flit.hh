@@ -38,6 +38,15 @@
 #include "mem/ruby/network/garnet/CommonTypes.hh"
 #include "mem/ruby/slicc_interface/Message.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
+namespace garnet
+{
+
 class flit
 {
   public:
@@ -126,5 +135,9 @@ operator<<(std::ostream& out, const flit& obj)
     out << std::flush;
     return out;
 }
+
+} // namespace garnet
+} // namespace ruby
+} // namespace gem5
 
 #endif // __MEM_RUBY_NETWORK_GARNET_0_FLIT_HH__

@@ -3,8 +3,8 @@
  * All rights reserved
  *
  * ----------------------------------------------------------------------------
- * Copyright (c) 2021, H2020 COSSIM.
- * Copyright (c) 2021, Exascale Performance Systems (EXAPSYS)
+ * Copyright (c) 2022, H2020 COSSIM.
+ * Copyright (c) 2022, Exascale Performance Systems (EXAPSYS)
  * ----------------------------------------------------------------------------
  * 
  * The license below extends only to copyright in the software and shall
@@ -61,6 +61,8 @@
 #include "params/COSSIMEtherLink.hh"
 #include "sim/eventq.hh"
 #include "sim/sim_object.hh"
+
+namespace gem5{
 
 class EtherDump;
 class Checkpoint;
@@ -167,5 +169,7 @@ class COSSIMEtherLink : public SimObject
     void closeHLA();
 
 };
+
+}
 
 #endif // __DEV_COSSIM_ETHERLINK_HH__

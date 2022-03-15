@@ -48,15 +48,21 @@ class PcPciHost(GenericPciHost):
 class Pc(Platform):
     type = 'Pc'
     cxx_header = "dev/x86/pc.hh"
+    cxx_class = 'gem5::Pc'
     system = Param.System(Parent.any, "system")
 
-    south_bridge = SouthBridge()
+    south_bridge = Param.SouthBridge(SouthBridge(), "Southbridge")
     pci_host = PcPciHost()
 
     # Serial port and terminal
     com_1 = Uart8250()
     com_1.pio_addr = x86IOAddress(0x3f8)
-    com_1.device = Terminal()
+    
+    def attachX86Terminal(self, cossim_enabled, nodeNum): #COSSIM
+        if cossim_enabled:
+            self.com_1.device = Terminal(port=(3000+nodeNum))
+        else:
+            self.com_1.device = Terminal()
 
     # Devices to catch access to non-existant serial ports.
     fake_com_2 = IsaFake(pio_addr=x86IOAddress(0x2f8), pio_size=8)

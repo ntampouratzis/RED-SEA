@@ -40,7 +40,7 @@
 
 #include "dev/arm/gic_v3.hh"
 
-#include "cpu/intr_control.hh"
+#include "cpu/base.hh"
 #include "debug/GIC.hh"
 #include "debug/Interrupt.hh"
 #include "dev/arm/gic_v3_cpu_interface.hh"
@@ -50,6 +50,9 @@
 #include "dev/platform.hh"
 #include "mem/packet.hh"
 #include "mem/packet_access.hh"
+
+namespace gem5
+{
 
 Gicv3::Gicv3(const Params &p)
     : BaseGic(p)
@@ -204,8 +207,9 @@ Gicv3::clearPPInt(uint32_t int_id, uint32_t cpu)
 void
 Gicv3::postInt(uint32_t cpu, ArmISA::InterruptTypes int_type)
 {
-    platform->intrctrl->post(cpu, int_type, 0);
-    ArmSystem::callClearStandByWfi(sys->threads[cpu]);
+    auto tc = sys->threads[cpu];
+    tc->getCpuPtr()->postInterrupt(tc->threadId(), int_type, 0);
+    ArmSystem::callClearStandByWfi(tc);
 }
 
 bool
@@ -218,19 +222,22 @@ Gicv3::supportsVersion(GicVersion version)
 void
 Gicv3::deassertInt(uint32_t cpu, ArmISA::InterruptTypes int_type)
 {
-    platform->intrctrl->clear(cpu, int_type, 0);
+    auto tc = sys->threads[cpu];
+    tc->getCpuPtr()->clearInterrupt(tc->threadId(), int_type, 0);
 }
 
 void
 Gicv3::deassertAll(uint32_t cpu)
 {
-    platform->intrctrl->clearAll(cpu);
+    auto tc = sys->threads[cpu];
+    tc->getCpuPtr()->clearInterrupts(tc->threadId());
 }
 
 bool
 Gicv3::haveAsserted(uint32_t cpu) const
 {
-    return platform->intrctrl->havePosted(cpu);
+    auto tc = sys->threads[cpu];
+    return tc->getCpuPtr()->checkInterrupts(tc->threadId());
 }
 
 Gicv3Redistributor *
@@ -294,3 +301,5 @@ Gicv3::unserialize(CheckpointIn & cp)
         cpuInterfaces[cpu_interface_id]->unserializeSection(cp,
             csprintf("cpuInterface.%i", cpu_interface_id));
 }
+
+} // namespace gem5

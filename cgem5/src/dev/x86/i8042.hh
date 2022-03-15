@@ -37,6 +37,9 @@
 #include "dev/ps2/device.hh"
 #include "params/I8042.hh"
 
+namespace gem5
+{
+
 namespace X86ISA
 {
 
@@ -110,8 +113,8 @@ class I8042 : public BasicPioDevice
     std::vector<IntSourcePin<I8042> *> mouseIntPin;
     std::vector<IntSourcePin<I8042> *> keyboardIntPin;
 
-    PS2Device *mouse;
-    PS2Device *keyboard;
+    ps2::Device *mouse;
+    ps2::Device *keyboard;
 
     void writeData(uint8_t newData, bool mouse = false);
     uint8_t readDataOut();
@@ -143,5 +146,6 @@ class I8042 : public BasicPioDevice
 };
 
 } // namespace X86ISA
+} // namespace gem5
 
 #endif //__DEV_X86_I8042_HH__

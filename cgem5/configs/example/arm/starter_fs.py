@@ -65,14 +65,12 @@ default_root_device = '/dev/vda1'
 # the cache class may be 'None' if the particular cache is not present.
 cpu_types = {
 
-    "atomic" : ( AtomicSimpleCPU, None, None, None, None),
+    "atomic" : ( AtomicSimpleCPU, None, None, None),
     "minor" : (MinorCPU,
                devices.L1I, devices.L1D,
-               devices.WalkCache,
                devices.L2),
     "hpi" : ( HPI.HPI,
               HPI.HPI_ICache, HPI.HPI_DCache,
-              HPI.HPI_WalkCache,
               HPI.HPI_L2)
 }
 
@@ -96,8 +94,7 @@ def create(args):
     # Only simulate caches when using a timing CPU (e.g., the HPI model)
     want_caches = True if mem_mode == "timing" else False
 
-    system = devices.simpleSystem(ArmSystem,
-                                  want_caches,
+    system = devices.SimpleSystem(want_caches,
                                   args.mem_size,
                                   cossim_enabled=args.cossim, #COSSIM
                                   nodeNum=args.nodeNum,       #COSSIM
@@ -140,8 +137,7 @@ def create(args):
     # Create a cache hierarchy for the cluster. We are assuming that
     # clusters have core-private L1 caches and an L2 that's shared
     # within the cluster.
-    for cluster in system.cpu_cluster:
-        system.addCaches(want_caches, last_cache_level=2)
+    system.addCaches(want_caches, last_cache_level=2)
 
     # Setup gem5's minimal Linux boot loader.
     system.realview.setupBootLoader(system, SysPaths.binary)
@@ -175,7 +171,41 @@ def create(args):
     return system
 
 
+def addEthernet(system, options): #COSSIM
+    # create NIC
+    dev = IGbE_e1000()
+    system.attach_pci(dev)
+    system.ethernet = dev
+    
+    system.etherlink = COSSIMEtherLink(nodeNum=options.nodeNum, TotalNodes=options.TotalNodes, sys_clk=options.sys_clock,SynchTime=options.SynchTime, RxPacketTime=options.RxPacketTime) #system_clock is used for synchronization
+    
+    system.etherlink.interface = Parent.system.ethernet.interface
+    if options.etherdump:
+        system.etherdump = EtherDump(file=options.etherdump)
+        system.etherlink.dump = system.etherdump
+
+def addStandAloneEthernet(system, options): #COSSIM
+    # create NIC
+    dev = IGbE_e1000()
+    system.attach_pci(dev)
+    system.ethernet = dev
+    
+    system.etherlink = EtherLink()
+    
+    system.etherlink.int0 = Parent.system.ethernet.interface
+    if options.etherdump:
+        system.etherdump = EtherDump(file=options.etherdump)
+        system.etherlink.dump = system.etherdump
+
+
+
 def run(args):
+    # Remove existing files from previous simulation (COSSIM)
+    NodeNum = args.nodeNum
+    os.system("rm -rf $GEM5/McPat/mcpatNode" + str(NodeNum) + ".xml")
+    os.system("rm -rf $GEM5/McPat/mcpatOutput" + str(NodeNum) + ".txt")
+    os.system("rm -rf $GEM5/McPat/energy" + str(NodeNum) + ".txt")
+    # END Remove existing files from previous simulation (COSSIM)
     cptdir = m5.options.outdir
     if args.checkpoint:
         print("Checkpoint directory: %s" % cptdir)
@@ -191,24 +221,20 @@ def run(args):
         else:
             print(exit_msg, " @ ", m5.curTick())
             break
-
+        
+    # Execute the McPat Script (COSSIM)   
+    if exit_msg == "m5_exit instruction encountered":
+        McPATXml = args.McPATXml #Specify the McPAT xml ProcessorDescriptionFile
+        if McPATXml == "empty":
+            print ("Power results are not available because McPat xml file is not exist!\n")
+        else:
+            print ("Power results are calculated with xml file: " + McPATXml + "\n")
+            os.system("$GEM5/runMcPat.sh " + str(NodeNum) + " " + str(McPATXml) + " &")
+    # END Execute the McPat Script (COSSIM)
+    
     sys.exit(event.getCode())
 
 
-def addEthernet(system, options): #COSSIM
-    # create NIC
-    dev = IGbE_e1000()
-    system.attach_pci(dev)
-    system.ethernet = dev
-    
-    system.etherlink = COSSIMEtherLink(nodeNum=options.nodeNum, TotalNodes=options.TotalNodes, sys_clk=options.sys_clock,SynchTime=options.SynchTime, RxPacketTime=options.RxPacketTime) #system_clock is used for synchronization
-    
-    system.etherlink.interface = Parent.system.ethernet.interface
-    if options.etherdump:
-        system.etherdump = EtherDump(file=options.etherdump)
-        system.etherlink.dump = system.etherdump
-
-    
 def main():
     parser = argparse.ArgumentParser(epilog=__doc__)
 
@@ -243,7 +269,7 @@ def main():
                         help="Specify the physical memory size")
     parser.add_argument("--checkpoint", action="store_true")
     parser.add_argument("--restore", type=str, default=None)
-    
+
     #COSSIM Options
     parser.add_argument("--cossim", action="store_true",
                       help="COSSIM distributed gem5 simulation.")
@@ -272,14 +298,15 @@ def main():
     parser.add_argument("--mcpat-xml", action="store", type=str, default="empty", dest="McPATXml",
                       help="Specify the McPAT xml ProcessorDescriptionFile")
 
-
     args = parser.parse_args()
-    
+
     root = Root(full_system=True)
     root.system = create(args)
     
     if args.cossim:                    #COSSIM
         addEthernet(root.system, args) #COSSIM
+    else:
+        addStandAloneEthernet(root.system, args) #COSSIM
 
     if args.restore is not None:
         m5.instantiate(args.restore)

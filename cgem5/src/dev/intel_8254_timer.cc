@@ -30,6 +30,11 @@
 
 #include "base/logging.hh"
 #include "debug/Intel8254Timer.hh"
+#include "sim/core.hh"
+#include "sim/cur_tick.hh"
+
+namespace gem5
+{
 
 Intel8254Timer::Intel8254Timer(EventManager *em, const std::string &name,
     Counter *counter0, Counter *counter1, Counter *counter2) :
@@ -271,7 +276,7 @@ Intel8254Timer::Counter::startup()
 
 Intel8254Timer::Counter::CounterEvent::CounterEvent(Counter* c_ptr)
 {
-    interval = (Tick)(SimClock::Float::s / 1193180.0);
+    interval = (Tick)(sim_clock::as_float::s / 1193180.0);
     counter = c_ptr;
 }
 
@@ -322,3 +327,4 @@ Intel8254Timer::Counter::CounterEvent::getInterval()
     return interval;
 }
 
+} // namespace gem5

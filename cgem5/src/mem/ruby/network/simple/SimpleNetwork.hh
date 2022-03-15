@@ -47,6 +47,12 @@
 #include "mem/ruby/network/Network.hh"
 #include "params/SimpleNetwork.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 class NetDest;
 class MessageBuffer;
 class Throttle;
@@ -104,13 +110,13 @@ class SimpleNetwork : public Network
     const bool m_adaptive_routing;
 
 
-    struct NetworkStats : public Stats::Group
+    struct NetworkStats : public statistics::Group
     {
-        NetworkStats(Stats::Group *parent);
+        NetworkStats(statistics::Group *parent);
 
         //Statistical variables
-        Stats::Formula* m_msg_counts[MessageSizeType_NUM];
-        Stats::Formula* m_msg_bytes[MessageSizeType_NUM];
+        statistics::Formula* m_msg_counts[MessageSizeType_NUM];
+        statistics::Formula* m_msg_bytes[MessageSizeType_NUM];
     } networkStats;
 };
 
@@ -121,5 +127,8 @@ operator<<(std::ostream& out, const SimpleNetwork& obj)
     out << std::flush;
     return out;
 }
+
+} // namespace ruby
+} // namespace gem5
 
 #endif // __MEM_RUBY_NETWORK_SIMPLE_SIMPLENETWORK_HH__

@@ -2,8 +2,6 @@
  * Copyright (c) 2014-2017 Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * For use for simulation and test purposes only
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -33,6 +31,7 @@
 
 #include "gpu-compute/fetch_unit.hh"
 
+#include "arch/amdgpu/common/tlb.hh"
 #include "base/bitfield.hh"
 #include "debug/GPUFetch.hh"
 #include "debug/GPUPort.hh"
@@ -43,6 +42,9 @@
 #include "gpu-compute/shader.hh"
 #include "gpu-compute/wavefront.hh"
 #include "mem/ruby/system/RubySystem.hh"
+
+namespace gem5
+{
 
 uint32_t FetchUnit::globalFetchUnitID;
 
@@ -143,7 +145,7 @@ FetchUnit::initiateFetch(Wavefront *wavefront)
     Addr vaddr = fetchBuf.at(wavefront->wfSlotId).nextFetchAddr();
 
     // this should already be aligned to a cache line
-    assert(vaddr == makeLineAddress(vaddr,
+    assert(vaddr == ruby::makeLineAddress(vaddr,
            computeUnit.getCacheLineBits()));
 
     // shouldn't be fetching a line that is already buffered
@@ -171,7 +173,7 @@ FetchUnit::initiateFetch(Wavefront *wavefront)
 
         // Sender State needed by TLB hierarchy
         pkt->senderState =
-            new TheISA::GpuTLB::TranslationState(BaseTLB::Execute,
+            new GpuTranslationState(BaseMMU::Execute,
                                                  computeUnit.shader->gpuTc,
                                                  false, pkt->senderState);
 
@@ -198,13 +200,13 @@ FetchUnit::initiateFetch(Wavefront *wavefront)
         }
     } else {
         pkt->senderState =
-            new TheISA::GpuTLB::TranslationState(BaseTLB::Execute,
+            new GpuTranslationState(BaseMMU::Execute,
                                                  computeUnit.shader->gpuTc);
 
         computeUnit.sqcTLBPort.sendFunctional(pkt);
 
-        TheISA::GpuTLB::TranslationState *sender_state =
-             safe_cast<TheISA::GpuTLB::TranslationState*>(pkt->senderState);
+        GpuTranslationState *sender_state =
+             safe_cast<GpuTranslationState*>(pkt->senderState);
 
         delete sender_state->tlbEntry;
         delete sender_state;
@@ -397,7 +399,7 @@ FetchUnit::FetchBufDesc::nextFetchAddr()
          * beginning of a cache line, so we adjust the readPtr by
          * the current PC's offset from the start of the line.
          */
-        next_line = makeLineAddress(wavefront->pc(), cacheLineBits);
+        next_line = ruby::makeLineAddress(wavefront->pc(), cacheLineBits);
         readPtr = bufStart;
 
         /**
@@ -409,7 +411,7 @@ FetchUnit::FetchBufDesc::nextFetchAddr()
         if (restartFromBranch) {
             restartFromBranch = false;
             int byte_offset
-                = wavefront->pc() - makeLineAddress(wavefront->pc(),
+                = wavefront->pc() - ruby::makeLineAddress(wavefront->pc(),
                                     cacheLineBits);
             readPtr += byte_offset;
         }
@@ -639,3 +641,5 @@ FetchUnit::FetchBufDesc::fetchBytesRemaining() const
     assert(bytes_remaining <= bufferedBytes());
     return bytes_remaining;
 }
+
+} // namespace gem5

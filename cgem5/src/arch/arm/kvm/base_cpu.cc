@@ -38,12 +38,17 @@
 #include "arch/arm/kvm/base_cpu.hh"
 
 #include <linux/kvm.h>
+#include <mutex>
 
 #include "arch/arm/interrupts.hh"
+#include "base/uncontended_mutex.hh"
 #include "debug/KvmInt.hh"
 #include "dev/arm/generic_timer.hh"
 #include "params/BaseArmKvmCPU.hh"
 #include "params/GenericTimer.hh"
+
+namespace gem5
+{
 
 using namespace ArmISA;
 
@@ -58,6 +63,21 @@ using namespace ArmISA;
 #define INTERRUPT_VCPU_FIQ(vcpu)                                \
     INTERRUPT_ID(KVM_ARM_IRQ_TYPE_CPU, vcpu, KVM_ARM_IRQ_CPU_FIQ)
 
+namespace {
+
+/**
+ * When the simulator returns from KVM for simulating other models, the
+ * in-kernel timer doesn't stop. We have to save the virtual time and
+ * restore before going into KVM next time. Moreover, setting virtual time
+ * affacts all vcpus according to the kvm implementation. We maintain a global
+ * virtual time here, restore it before the first vcpu going into KVM, and save
+ * it after the last vcpu back from KVM.
+ */
+uint64_t vtime = 0;
+uint64_t vtime_counter = 0;
+UncontendedMutex vtime_mutex;
+
+}  // namespace
 
 BaseArmKvmCPU::BaseArmKvmCPU(const BaseArmKvmCPUParams &params)
     : BaseKvmCPU(params),
@@ -147,6 +167,26 @@ BaseArmKvmCPU::kvmRun(Tick ticks)
     return kvmRunTicks;
 }
 
+void
+BaseArmKvmCPU::ioctlRun()
+{
+    // Check if it's the first vcpu going into KVM. If yes, it should restore
+    // the virtual time.
+    {
+        std::lock_guard<UncontendedMutex> l(vtime_mutex);
+        if (vtime_counter++ == 0)
+            setOneReg(KVM_REG_ARM_TIMER_CNT, vtime);
+    }
+    BaseKvmCPU::ioctlRun();
+    // Check if it's the last vcpu back from KVM. If yes, it should save the
+    // virtual time.
+    {
+        std::lock_guard<UncontendedMutex> l(vtime_mutex);
+        if (--vtime_counter == 0)
+            getOneReg(KVM_REG_ARM_TIMER_CNT, &vtime);
+    }
+}
+
 const BaseArmKvmCPU::RegIndexVector &
 BaseArmKvmCPU::getRegList() const
 {
@@ -161,10 +201,11 @@ BaseArmKvmCPU::getRegList() const
 
         // Request the actual register list now that we know how many
         // register we need to allocate space for.
-        std::unique_ptr<struct kvm_reg_list> regs;
-        const size_t size(sizeof(struct kvm_reg_list) +
+        std::unique_ptr<kvm_reg_list, void(*)(void *p)>
+            regs(nullptr, [](void *p) { operator delete(p); });
+        const size_t size(sizeof(kvm_reg_list) +
                           regs_probe.n * sizeof(uint64_t));
-        regs.reset((struct kvm_reg_list *)operator new(size));
+        regs.reset((kvm_reg_list *)operator new(size));
         regs->n = regs_probe.n;
         if (!getRegList(*regs))
             panic("Failed to determine register list size.\n");
@@ -183,7 +224,7 @@ BaseArmKvmCPU::kvmArmVCpuInit(const struct kvm_vcpu_init &init)
 }
 
 bool
-BaseArmKvmCPU::getRegList(struct kvm_reg_list &regs) const
+BaseArmKvmCPU::getRegList(kvm_reg_list &regs) const
 {
     if (ioctl(KVM_GET_REG_LIST, (void *)&regs) == -1) {
         if (errno == E2BIG) {
@@ -196,3 +237,5 @@ BaseArmKvmCPU::getRegList(struct kvm_reg_list &regs) const
         return true;
     }
 }
+
+} // namespace gem5

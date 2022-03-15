@@ -35,8 +35,12 @@
 
 #include <string>
 
-#include "arch/riscv/registers.hh"
+#include "arch/riscv/regs/float.hh"
+#include "arch/riscv/regs/int.hh"
 #include "base/remote_gdb.hh"
+
+namespace gem5
+{
 
 class System;
 class ThreadContext;
@@ -66,7 +70,8 @@ class RemoteGDB : public BaseRemoteGDB
          * 2. Add register to struct below
          * 3. Modify RiscvGdbRegCache::getRegs and setRegs
          */
-        struct {
+        struct
+        {
             uint64_t gpr[NumIntArchRegs];
             uint64_t pc;
             uint64_t fpu[NumFloatRegs];
@@ -140,7 +145,7 @@ class RemoteGDB : public BaseRemoteGDB
     RiscvGdbRegCache regCache;
 
   public:
-    RemoteGDB(System *_system, ThreadContext *tc, int _port);
+    RemoteGDB(System *_system, int _port);
     BaseGdbRegCache *gdbRegs() override;
     /**
      * Informs GDB remote serial protocol that XML features are supported
@@ -159,5 +164,6 @@ class RemoteGDB : public BaseRemoteGDB
 };
 
 } // namespace RiscvISA
+} // namespace gem5
 
 #endif /* __ARCH_RISCV_REMOTE_GDB_H__ */

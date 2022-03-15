@@ -32,6 +32,7 @@
 
 #include "arch/arm/fastmodel/amba_ports.hh"
 #include "arch/arm/fastmodel/common/signal_receiver.hh"
+#include "arch/arm/fastmodel/common/signal_sender.hh"
 #include "arch/arm/fastmodel/iris/cpu.hh"
 #include "arch/arm/fastmodel/protocol/exported_clock_rate_control.hh"
 #include "arch/arm/fastmodel/protocol/signal_interrupt.hh"
@@ -49,7 +50,11 @@
 #include "systemc/ext/core/sc_module.hh"
 #include "systemc/tlm_port_wrapper.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 class CortexR52Cluster;
@@ -74,6 +79,8 @@ class ScxEvsCortexR52 : public Types::Base, public Iris::BaseCpuEvs
     struct CorePins
     {
         using CoreInt = IntSinkPin<CorePins>;
+        template <typename T>
+        using SignalInitiator = amba_pv::signal_master_port<T>;
 
         std::string name;
         Evs *evs;
@@ -98,6 +105,12 @@ class ScxEvsCortexR52 : public Types::Base, public Iris::BaseCpuEvs
         AmbaInitiator llpp;
         AmbaInitiator flash;
         AmbaInitiator amba;
+
+        SignalSender core_reset;
+        SignalSender poweron_reset;
+        SignalSender halt;
+
+        SignalInitiator<uint64_t> cfgvectable;
     };
 
     std::vector<std::unique_ptr<CorePins>> corePins;
@@ -109,6 +122,10 @@ class ScxEvsCortexR52 : public Types::Base, public Iris::BaseCpuEvs
     CortexR52Cluster *gem5CpuCluster;
 
     const Params &params;
+
+    AmbaTarget ext_slave;
+
+    SignalSender top_reset;
 
   public:
     ScxEvsCortexR52(const Params &p) : ScxEvsCortexR52(p.name.c_str(), p) {}
@@ -143,6 +160,8 @@ class ScxEvsCortexR52 : public Types::Base, public Iris::BaseCpuEvs
     void setSysCounterFrq(uint64_t sys_counter_frq) override;
 
     void setCluster(SimObject *cluster) override;
+
+    void setResetAddr(int core, Addr addr, bool secure) override;
 };
 
 struct ScxEvsCortexR52x1Types
@@ -181,6 +200,7 @@ struct ScxEvsCortexR52x4Types
 using ScxEvsCortexR52x4 = ScxEvsCortexR52<ScxEvsCortexR52x4Types>;
 extern template class ScxEvsCortexR52<ScxEvsCortexR52x4Types>;
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5
 
 #endif // __ARCH_ARM_FASTMODEL_CORTEXR52_EVS_HH__

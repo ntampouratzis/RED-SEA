@@ -43,7 +43,7 @@ decode QUADRANT default Unknown::unknown() {
                   CIMM8<5:2> << 6;
         }}, {{
             if (machInst == 0)
-                fault = std::make_shared<IllegalInstFault>("zero instruction",
+                return std::make_shared<IllegalInstFault>("zero instruction",
                                                            machInst);
             Rp2 = sp + imm;
         }}, uint64_t);
@@ -53,7 +53,7 @@ decode QUADRANT default Unknown::unknown() {
             }}, {{
                 STATUS status = xc->readMiscReg(MISCREG_STATUS);
                 if (status.fs == FPUStatus::OFF)
-                    fault = std::make_shared<IllegalInstFault>("FPU is off",
+                    return std::make_shared<IllegalInstFault>("FPU is off",
                                                                machInst);
 
                 Fp2_bits = Mem;
@@ -83,7 +83,7 @@ decode QUADRANT default Unknown::unknown() {
             }}, {{
                 STATUS status = xc->readMiscReg(MISCREG_STATUS);
                 if (status.fs == FPUStatus::OFF)
-                    fault = std::make_shared<IllegalInstFault>("FPU is off",
+                    return std::make_shared<IllegalInstFault>("FPU is off",
                                                                machInst);
 
                 Mem = Fp2_bits;
@@ -117,11 +117,12 @@ decode QUADRANT default Unknown::unknown() {
             }}, {{
                 if ((RC1 == 0) != (imm == 0)) {
                     if (RC1 == 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "source reg x0", machInst);
-                    } else // imm == 0
-                        fault = std::make_shared<IllegalInstFault>(
+                    } else { // imm == 0
+                        return std::make_shared<IllegalInstFault>(
                                 "immediate = 0", machInst);
+                    }
                 }
                 Rc1_sd = Rc1_sd + imm;
             }});
@@ -131,7 +132,7 @@ decode QUADRANT default Unknown::unknown() {
                     imm |= ~((uint64_t)0x1F);
             }}, {{
                 if (RC1 == 0) {
-                    fault = std::make_shared<IllegalInstFault>(
+                    return std::make_shared<IllegalInstFault>(
                             "source reg x0", machInst);
                 }
                 Rc1_sd = (int32_t)Rc1_sd + imm;
@@ -142,7 +143,7 @@ decode QUADRANT default Unknown::unknown() {
                     imm |= ~((uint64_t)0x1F);
             }}, {{
                 if (RC1 == 0) {
-                    fault = std::make_shared<IllegalInstFault>(
+                    return std::make_shared<IllegalInstFault>(
                             "source reg x0", machInst);
                 }
                 Rc1_sd = imm;
@@ -157,7 +158,7 @@ decode QUADRANT default Unknown::unknown() {
                         imm |= ~((int64_t)0x1FF);
                 }}, {{
                     if (imm == 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "immediate = 0", machInst);
                     }
                     sp_sd = sp_sd + imm;
@@ -168,11 +169,11 @@ decode QUADRANT default Unknown::unknown() {
                         imm |= ~((uint64_t)0x1FFFF);
                 }}, {{
                     if (RC1 == 0 || RC1 == 2) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "source reg x0", machInst);
                     }
                     if (imm == 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "immediate = 0", machInst);
                     }
                     Rc1_sd = imm;
@@ -185,7 +186,7 @@ decode QUADRANT default Unknown::unknown() {
                     imm = CIMM5 | (CIMM1 << 5);
                 }}, {{
                     if (imm == 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "immediate = 0", machInst);
                     }
                     Rp1 = Rp1 >> imm;
@@ -194,7 +195,7 @@ decode QUADRANT default Unknown::unknown() {
                     imm = CIMM5 | (CIMM1 << 5);
                 }}, {{
                     if (imm == 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "immediate = 0", machInst);
                     }
                     Rp1_sd = Rp1_sd >> imm;
@@ -257,11 +258,11 @@ decode QUADRANT default Unknown::unknown() {
             imm = CIMM5 | (CIMM1 << 5);
         }}, {{
             if (imm == 0) {
-                fault = std::make_shared<IllegalInstFault>(
+                return std::make_shared<IllegalInstFault>(
                         "immediate = 0", machInst);
             }
             if (RC1 == 0) {
-                fault = std::make_shared<IllegalInstFault>(
+                return std::make_shared<IllegalInstFault>(
                         "source reg x0", machInst);
             }
             Rc1 = Rc1 << imm;
@@ -282,7 +283,7 @@ decode QUADRANT default Unknown::unknown() {
                          CIMM5<1:0> << 6;
             }}, {{
                 if (RC1 == 0) {
-                    fault = std::make_shared<IllegalInstFault>(
+                    return std::make_shared<IllegalInstFault>(
                             "source reg x0", machInst);
                 }
                 Rc1_sd = Mem_sw;
@@ -295,7 +296,7 @@ decode QUADRANT default Unknown::unknown() {
                          CIMM5<2:0> << 6;
             }}, {{
                 if (RC1 == 0) {
-                    fault = std::make_shared<IllegalInstFault>(
+                    return std::make_shared<IllegalInstFault>(
                             "source reg x0", machInst);
                 }
                 Rc1_sd = Mem_sd;
@@ -307,14 +308,14 @@ decode QUADRANT default Unknown::unknown() {
             0x0: decode RC2 {
                 0x0: Jump::c_jr({{
                     if (RC1 == 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "source reg x0", machInst);
                     }
                     NPC = Rc1;
                 }}, IsIndirectControl, IsUncondControl, IsCall);
                 default: CROp::c_mv({{
                     if (RC1 == 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "source reg x0", machInst);
                     }
                     Rc1 = Rc2;
@@ -323,15 +324,15 @@ decode QUADRANT default Unknown::unknown() {
             0x1: decode RC1 {
                 0x0: SystemOp::c_ebreak({{
                     if (RC2 != 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "source reg x1", machInst);
                     }
-                    fault = std::make_shared<BreakpointFault>(xc->pcState());
+                    return std::make_shared<BreakpointFault>(xc->pcState());
                 }}, IsSerializeAfter, IsNonSpeculative, No_OpClass);
                 default: decode RC2 {
                     0x0: Jump::c_jalr({{
                         if (RC1 == 0) {
-                            fault = std::make_shared<IllegalInstFault>(
+                            return std::make_shared<IllegalInstFault>(
                                     "source reg x0", machInst);
                         }
                         ra = NPC;
@@ -402,7 +403,7 @@ decode QUADRANT default Unknown::unknown() {
                 0x2: flw({{
                     STATUS status = xc->readMiscReg(MISCREG_STATUS);
                     if (status.fs == FPUStatus::OFF)
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                     "FPU is off", machInst);
                     freg_t fd;
                     fd = freg(f32(Mem_uw));
@@ -411,7 +412,7 @@ decode QUADRANT default Unknown::unknown() {
                 0x3: fld({{
                     STATUS status = xc->readMiscReg(MISCREG_STATUS);
                     if (status.fs == FPUStatus::OFF)
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                     "FPU is off", machInst);
                     freg_t fd;
                     fd = freg(f64(Mem));
@@ -508,7 +509,7 @@ decode QUADRANT default Unknown::unknown() {
                 0x2: fsw({{
                     STATUS status = xc->readMiscReg(MISCREG_STATUS);
                     if (status.fs == FPUStatus::OFF)
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "FPU is off", machInst);
 
                     Mem_uw = (uint32_t)Fs2_bits;
@@ -516,7 +517,7 @@ decode QUADRANT default Unknown::unknown() {
                 0x3: fsd({{
                     STATUS status = xc->readMiscReg(MISCREG_STATUS);
                     if (status.fs == FPUStatus::OFF)
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "FPU is off", machInst);
 
                     Mem_ud = Fs2_bits;
@@ -692,10 +693,10 @@ decode QUADRANT default Unknown::unknown() {
                     0x1: mulh({{
                         bool negate = (Rs1_sd < 0) != (Rs2_sd < 0);
 
-                        uint64_t Rs1_lo = (uint32_t)abs(Rs1_sd);
-                        uint64_t Rs1_hi = (uint64_t)abs(Rs1_sd) >> 32;
-                        uint64_t Rs2_lo = (uint32_t)abs(Rs2_sd);
-                        uint64_t Rs2_hi = (uint64_t)abs(Rs2_sd) >> 32;
+                        uint64_t Rs1_lo = (uint32_t)std::abs(Rs1_sd);
+                        uint64_t Rs1_hi = (uint64_t)std::abs(Rs1_sd) >> 32;
+                        uint64_t Rs2_lo = (uint32_t)std::abs(Rs2_sd);
+                        uint64_t Rs2_hi = (uint64_t)std::abs(Rs2_sd) >> 32;
 
                         uint64_t hi = Rs1_hi*Rs2_hi;
                         uint64_t mid1 = Rs1_hi*Rs2_lo;
@@ -718,8 +719,8 @@ decode QUADRANT default Unknown::unknown() {
                     }});
                     0x1: mulhsu({{
                         bool negate = Rs1_sd < 0;
-                        uint64_t Rs1_lo = (uint32_t)abs(Rs1_sd);
-                        uint64_t Rs1_hi = (uint64_t)abs(Rs1_sd) >> 32;
+                        uint64_t Rs1_lo = (uint32_t)std::abs(Rs1_sd);
+                        uint64_t Rs1_hi = (uint64_t)std::abs(Rs1_sd) >> 32;
                         uint64_t Rs2_lo = (uint32_t)Rs2;
                         uint64_t Rs2_hi = Rs2 >> 32;
 
@@ -909,7 +910,8 @@ decode QUADRANT default Unknown::unknown() {
                     freg_t fd;
                     fd = freg(f32_mulAdd(f32(freg(Fs1_bits)),
                                     f32(freg(Fs2_bits)),
-                                    f32(f32(freg(Fs3_bits)).v ^ F32_SIGN)));
+                                    f32(f32(freg(Fs3_bits)).v ^
+                                        mask(31, 31))));
                     Fd_bits = fd.v;
                 }}, FloatMultAccOp);
                 0x1: fmsub_d({{
@@ -917,7 +919,8 @@ decode QUADRANT default Unknown::unknown() {
                     freg_t fd;
                     fd = freg(f64_mulAdd(f64(freg(Fs1_bits)),
                                     f64(freg(Fs2_bits)),
-                                    f64(f64(freg(Fs3_bits)).v ^ F64_SIGN)));
+                                    f64(f64(freg(Fs3_bits)).v ^
+                                        mask(63, 63))));
                     Fd_bits = fd.v;
                 }}, FloatMultAccOp);
             }
@@ -925,7 +928,8 @@ decode QUADRANT default Unknown::unknown() {
                 0x0: fnmsub_s({{
                     RM_REQUIRED;
                     freg_t fd;
-                    fd = freg(f32_mulAdd(f32(f32(freg(Fs1_bits)).v ^ F32_SIGN),
+                    fd = freg(f32_mulAdd(f32(f32(freg(Fs1_bits)).v ^
+                                             mask(31, 31)),
                                          f32(freg(Fs2_bits)),
                                          f32(freg(Fs3_bits))));
                     Fd_bits = fd.v;
@@ -933,7 +937,8 @@ decode QUADRANT default Unknown::unknown() {
                 0x1: fnmsub_d({{
                     RM_REQUIRED;
                     freg_t fd;
-                    fd = freg(f64_mulAdd(f64(f64(freg(Fs1_bits)).v ^ F64_SIGN),
+                    fd = freg(f64_mulAdd(f64(f64(freg(Fs1_bits)).v ^
+                                             mask(63, 63)),
                                          f64(freg(Fs2_bits)),
                                          f64(freg(Fs3_bits))));
                     Fd_bits = fd.v;
@@ -943,17 +948,21 @@ decode QUADRANT default Unknown::unknown() {
                 0x0: fnmadd_s({{
                     RM_REQUIRED;
                     freg_t fd;
-                    fd = freg(f32_mulAdd(f32(f32(freg(Fs1_bits)).v ^ F32_SIGN),
+                    fd = freg(f32_mulAdd(f32(f32(freg(Fs1_bits)).v ^
+                                             mask(31, 31)),
                                     f32(freg(Fs2_bits)),
-                                    f32(f32(freg(Fs3_bits)).v ^ F32_SIGN)));
+                                    f32(f32(freg(Fs3_bits)).v ^
+                                        mask(31, 31))));
                     Fd_bits = fd.v;
                 }}, FloatMultAccOp);
                 0x1: fnmadd_d({{
                     RM_REQUIRED;
                     freg_t fd;
-                    fd = freg(f64_mulAdd(f64(f64(freg(Fs1_bits)).v ^ F64_SIGN),
+                    fd = freg(f64_mulAdd(f64(f64(freg(Fs1_bits)).v ^
+                                             mask(63, 63)),
                                     f64(freg(Fs2_bits)),
-                                    f64(f64(freg(Fs3_bits)).v ^ F64_SIGN)));
+                                    f64(f64(freg(Fs3_bits)).v ^
+                                        mask(63, 63))));
                     Fd_bits = fd.v;
                 }}, FloatMultAccOp);
             }
@@ -1016,42 +1025,29 @@ decode QUADRANT default Unknown::unknown() {
                 }}, FloatDivOp);
                 0x10: decode ROUND_MODE {
                     0x0: fsgnj_s({{
-                        freg_t fd;
-                        fd = freg(fsgnj32(freg(Fs1_bits), freg(Fs2_bits),
-                                          false, false));
-                        Fd_bits = fd.v;
+                        Fd_bits = boxF32(insertBits(unboxF32(Fs2_bits), 30, 0,
+                                                    unboxF32(Fs1_bits)));
                         }}, FloatMiscOp);
                     0x1: fsgnjn_s({{
-                        freg_t fd;
-                        fd = freg(fsgnj32(freg(Fs1_bits), freg(Fs2_bits),
-                                          true, false));
-                        Fd_bits = fd.v;
+                        Fd_bits = boxF32(insertBits(unboxF32(~Fs2_bits), 30, 0,
+                                                    unboxF32(Fs1_bits)));
                         }}, FloatMiscOp);
                     0x2: fsgnjx_s({{
-                        freg_t fd;
-                        fd = freg(fsgnj32(freg(Fs1_bits), freg(Fs2_bits),
-                                          false, true));
-                        Fd_bits = fd.v;
+                        Fd_bits = boxF32(insertBits(
+                                    unboxF32(Fs1_bits) ^ unboxF32(Fs2_bits),
+                                    30, 0, unboxF32(Fs1_bits)));
                         }}, FloatMiscOp);
                 }
                 0x11: decode ROUND_MODE {
                     0x0: fsgnj_d({{
-                        freg_t fd;
-                        fd = freg(fsgnj64(freg(Fs1_bits), freg(Fs2_bits),
-                                          false, false));
-                        Fd_bits = fd.v;
+                        Fd_bits = insertBits(Fs2_bits, 62, 0, Fs1_bits);
                     }}, FloatMiscOp);
                     0x1: fsgnjn_d({{
-                        freg_t fd;
-                        fd = freg(fsgnj64(freg(Fs1_bits), freg(Fs2_bits),
-                                          true, false));
-                        Fd_bits = fd.v;
+                        Fd_bits = insertBits(~Fs2_bits, 62, 0, Fs1_bits);
                     }}, FloatMiscOp);
                     0x2: fsgnjx_d({{
-                        freg_t fd;
-                        fd = freg(fsgnj64(freg(Fs1_bits), freg(Fs2_bits),
-                                          false, true));
-                        Fd_bits = fd.v;
+                        Fd_bits = insertBits(
+                                Fs1_bits ^ Fs2_bits, 62, 0, Fs1_bits);
                     }}, FloatMiscOp);
                 }
                 0x14: decode ROUND_MODE {
@@ -1060,7 +1056,7 @@ decode QUADRANT default Unknown::unknown() {
                             f32(freg(Fs2_bits))) ||
                             (f32_eq(f32(freg(Fs1_bits)),
                             f32(freg(Fs2_bits))) &&
-                            (f32(freg(Fs1_bits)).v & F32_SIGN));
+                            bits(f32(freg(Fs1_bits)).v, 31));
 
                         Fd_bits = less ||
                             isNaNF32UI(f32(freg(Fs2_bits)).v) ?
@@ -1074,7 +1070,7 @@ decode QUADRANT default Unknown::unknown() {
                             f32(freg(Fs1_bits))) ||
                             (f32_eq(f32(freg(Fs2_bits)),
                             f32(freg(Fs1_bits))) &&
-                            (f32(freg(Fs2_bits)).v & F32_SIGN));
+                            bits(f32(freg(Fs2_bits)).v, 31));
 
                         Fd_bits = greater ||
                             isNaNF32UI(f32(freg(Fs2_bits)).v) ?
@@ -1090,7 +1086,7 @@ decode QUADRANT default Unknown::unknown() {
                             f64(freg(Fs2_bits))) ||
                             (f64_eq(f64(freg(Fs1_bits)),
                             f64(freg(Fs2_bits))) &&
-                            (f64(freg(Fs1_bits)).v & F64_SIGN));
+                            bits(f64(freg(Fs1_bits)).v, 63));
 
                         Fd_bits = less ||
                             isNaNF64UI(f64(freg(Fs2_bits)).v) ?
@@ -1105,7 +1101,7 @@ decode QUADRANT default Unknown::unknown() {
                             f64(freg(Fs1_bits))) ||
                             (f64_eq(f64(freg(Fs2_bits)),
                             f64(freg(Fs1_bits))) &&
-                            (f64(freg(Fs2_bits)).v & F64_SIGN));
+                            bits(f64(freg(Fs2_bits)).v, 63));
 
                         Fd_bits = greater ||
                             isNaNF64UI(f64(freg(Fs2_bits)).v) ?
@@ -1117,7 +1113,7 @@ decode QUADRANT default Unknown::unknown() {
                 }
                 0x20: fcvt_s_d({{
                     if (CONV_SGN != 1) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "CONV_SGN != 1", machInst);
                     }
                     RM_REQUIRED;
@@ -1127,7 +1123,7 @@ decode QUADRANT default Unknown::unknown() {
                 }}, FloatCvtOp);
                 0x21: fcvt_d_s({{
                     if (CONV_SGN != 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "CONV_SGN != 0", machInst);
                     }
                     RM_REQUIRED;
@@ -1137,7 +1133,7 @@ decode QUADRANT default Unknown::unknown() {
                 }}, FloatCvtOp);
                 0x2c: fsqrt_s({{
                     if (RS2 != 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "source reg x1", machInst);
                     }
                     freg_t fd;
@@ -1147,7 +1143,7 @@ decode QUADRANT default Unknown::unknown() {
                 }}, FloatSqrtOp);
                 0x2d: fsqrt_d({{
                     if (RS2 != 0) {
-                        fault = std::make_shared<IllegalInstFault>(
+                        return std::make_shared<IllegalInstFault>(
                                 "source reg x1", machInst);
                     }
                     freg_t fd;
@@ -1180,13 +1176,13 @@ decode QUADRANT default Unknown::unknown() {
                 0x60: decode CONV_SGN {
                     0x0: fcvt_w_s({{
                         RM_REQUIRED;
-                        Rd_sd = sext32(f32_to_i32(f32(freg(Fs1_bits)), rm,
-                                                  true));
+                        Rd_sd = sext<32>(f32_to_i32(f32(freg(Fs1_bits)), rm,
+                                                    true));
                     }}, FloatCvtOp);
                     0x1: fcvt_wu_s({{
                         RM_REQUIRED;
-                        Rd = sext32(f32_to_ui32(f32(freg(Fs1_bits)), rm,
-                                                true));
+                        Rd = sext<32>(f32_to_ui32(f32(freg(Fs1_bits)), rm,
+                                                  true));
                     }}, FloatCvtOp);
                     0x2: fcvt_l_s({{
                         RM_REQUIRED;
@@ -1200,13 +1196,13 @@ decode QUADRANT default Unknown::unknown() {
                 0x61: decode CONV_SGN {
                     0x0: fcvt_w_d({{
                         RM_REQUIRED;
-                        Rd_sd = sext32(f64_to_i32(f64(freg(Fs1_bits)), rm,
-                                                  true));
+                        Rd_sd = sext<32>(f64_to_i32(f64(freg(Fs1_bits)), rm,
+                                                    true));
                     }}, FloatCvtOp);
                     0x1: fcvt_wu_d({{
                         RM_REQUIRED;
-                        Rd = sext32(f64_to_ui32(f64(freg(Fs1_bits)), rm,
-                                                true));
+                        Rd = sext<32>(f64_to_ui32(f64(freg(Fs1_bits)), rm,
+                                                  true));
                     }}, FloatCvtOp);
                     0x2: fcvt_l_d({{
                         RM_REQUIRED;
@@ -1357,12 +1353,12 @@ decode QUADRANT default Unknown::unknown() {
                 0x0: decode FUNCT7 {
                     0x0: decode RS2 {
                         0x0: ecall({{
-                            fault = std::make_shared<SyscallFault>(
+                            return std::make_shared<SyscallFault>(
                                 (PrivilegeMode)xc->readMiscReg(MISCREG_PRV));
                         }}, IsSerializeAfter, IsNonSpeculative, IsSyscall,
                             No_OpClass);
                         0x1: ebreak({{
-                            fault = std::make_shared<BreakpointFault>(
+                            return std::make_shared<BreakpointFault>(
                                 xc->pcState());
                         }}, IsSerializeAfter, IsNonSpeculative, No_OpClass);
                         0x2: uret({{
@@ -1380,7 +1376,7 @@ decode QUADRANT default Unknown::unknown() {
                                 MISCREG_PRV);
                             if (pm == PRV_U ||
                                 (pm == PRV_S && status.tsr == 1)) {
-                                fault = std::make_shared<IllegalInstFault>(
+                                return std::make_shared<IllegalInstFault>(
                                             "sret in user mode or TSR enabled",
                                             machInst);
                                 NPC = NPC;
@@ -1399,7 +1395,7 @@ decode QUADRANT default Unknown::unknown() {
                                 MISCREG_PRV);
                             if (pm == PRV_U ||
                                 (pm == PRV_S && status.tw == 1)) {
-                                fault = std::make_shared<IllegalInstFault>(
+                                return std::make_shared<IllegalInstFault>(
                                             "wfi in user mode or TW enabled",
                                             machInst);
                             }
@@ -1410,7 +1406,7 @@ decode QUADRANT default Unknown::unknown() {
                         STATUS status = xc->readMiscReg(MISCREG_STATUS);
                         auto pm = (PrivilegeMode)xc->readMiscReg(MISCREG_PRV);
                         if (pm == PRV_U || (pm == PRV_S && status.tvm == 1)) {
-                            fault = std::make_shared<IllegalInstFault>(
+                            return std::make_shared<IllegalInstFault>(
                                         "sfence in user mode or TVM enabled",
                                         machInst);
                         }
@@ -1418,12 +1414,13 @@ decode QUADRANT default Unknown::unknown() {
                     }}, IsNonSpeculative, IsSerializeAfter, No_OpClass);
                     0x18: mret({{
                         if (xc->readMiscReg(MISCREG_PRV) != PRV_M) {
-                            fault = std::make_shared<IllegalInstFault>(
+                            return std::make_shared<IllegalInstFault>(
                                         "mret at lower privilege", machInst);
                             NPC = NPC;
                         } else {
                             STATUS status = xc->readMiscReg(MISCREG_STATUS);
                             xc->setMiscReg(MISCREG_PRV, status.mpp);
+                            xc->setMiscReg(MISCREG_NMIE, 1);
                             status.mie = status.mpie;
                             status.mpie = 1;
                             status.mpp = PRV_U;

@@ -38,6 +38,9 @@
 #include "arch/x86/decoder.hh"
 #include "arch/x86/types.hh"
 
+namespace gem5
+{
+
 namespace X86ISA
 {
     const uint8_t CS = CSOverride;
@@ -164,7 +167,8 @@ namespace X86ISA
 /*  F */ 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0
     };
 
-    enum SizeType {
+    enum SizeType
+    {
         NoImm,
         NI = NoImm,
         ByteImm,
@@ -282,4 +286,5 @@ namespace X86ISA
 /*  E */ 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 ,
 /*  F */ 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0 , 0
     };
-}
+} // namespace X86ISA
+} // namespace gem5

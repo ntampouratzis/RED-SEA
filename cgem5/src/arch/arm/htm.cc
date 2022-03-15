@@ -36,7 +36,13 @@
  */
 
 #include "arch/arm/htm.hh"
+
+#include "arch/arm/regs/int.hh"
+#include "arch/arm/regs/misc.hh"
 #include "cpu/thread_context.hh"
+
+namespace gem5
+{
 
 void
 ArmISA::HTMCheckpoint::reset()
@@ -70,7 +76,7 @@ ArmISA::HTMCheckpoint::save(ThreadContext *tc)
     //tme_checkpoint->iccPmrEl1 = tc->readMiscReg(MISCREG_ICC_PMR_EL1);
     nzcv = tc->readMiscReg(MISCREG_NZCV);
     daif = tc->readMiscReg(MISCREG_DAIF);
-    for (auto n = 0; n < NumIntArchRegs; n++) {
+    for (auto n = 0; n < NUM_ARCH_INTREGS; n++) {
         x[n] = tc->readIntReg(n);
     }
     // TODO first detect if FP is enabled at this EL
@@ -84,7 +90,7 @@ ArmISA::HTMCheckpoint::save(ThreadContext *tc)
     }
     fpcr = tc->readMiscReg(MISCREG_FPCR);
     fpsr = tc->readMiscReg(MISCREG_FPSR);
-    pcstateckpt = tc->pcState();
+    pcstateckpt = tc->pcState().as<PCState>();
 
     BaseHTMCheckpoint::save(tc);
 }
@@ -97,7 +103,7 @@ ArmISA::HTMCheckpoint::restore(ThreadContext *tc, HtmFailureFaultCause cause)
     //tc->setMiscReg(MISCREG_ICC_PMR_EL1, tme_checkpoint->iccPmrEl1);
     tc->setMiscReg(MISCREG_NZCV, nzcv);
     tc->setMiscReg(MISCREG_DAIF, daif);
-    for (auto n = 0; n < NumIntArchRegs; n++) {
+    for (auto n = 0; n < NUM_ARCH_INTREGS; n++) {
         tc->setIntReg(n, x[n]);
     }
     // TODO first detect if FP is enabled at this EL
@@ -123,7 +129,7 @@ ArmISA::HTMCheckpoint::restore(ThreadContext *tc, HtmFailureFaultCause cause)
       case HtmFailureFaultCause::EXPLICIT:
         replaceBits(error_code, 14, 0, tcreason);
         replaceBits(error_code, 16, 1);
-        retry = bits(15, tcreason);
+        retry = bits(tcreason, 15);
         break;
       case HtmFailureFaultCause::MEMORY:
         replaceBits(error_code, 17, 1);
@@ -161,3 +167,5 @@ ArmISA::HTMCheckpoint::restore(ThreadContext *tc, HtmFailureFaultCause cause)
 
     BaseHTMCheckpoint::restore(tc, cause);
 }
+
+} // namespace gem5

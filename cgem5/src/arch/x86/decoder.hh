@@ -44,6 +44,10 @@
 #include "cpu/decode_cache.hh"
 #include "cpu/static_inst.hh"
 #include "debug/Decoder.hh"
+#include "params/X86Decoder.hh"
+
+namespace gem5
+{
 
 namespace X86ISA
 {
@@ -71,6 +75,8 @@ class Decoder : public InstDecoder
     static X86ISAInst::MicrocodeRom microcodeRom;
 
   protected:
+    using MachInst = uint64_t;
+
     struct InstBytes
     {
         StaticInstPtr si;
@@ -169,10 +175,6 @@ class Decoder : public InstDecoder
 
     // State machine state.
   protected:
-    // Whether or not we're out of bytes.
-    bool outOfBytes = true;
-    // Whether we've completed generating an ExtMachInst.
-    bool instDone = false;
     // The size of the displacement value.
     int displacementSize;
     // The size of the immediate value.
@@ -181,7 +183,8 @@ class Decoder : public InstDecoder
     // for both the actual immediate and the displacement.
     int immediateCollected;
 
-    enum State {
+    enum State
+    {
         ResetState,
         FromCacheState,
         PrefixState,
@@ -231,18 +234,27 @@ class Decoder : public InstDecoder
 
     typedef RegVal CacheKey;
 
-    typedef DecodeCache::AddrMap<Decoder::InstBytes> DecodePages;
+    typedef decode_cache::AddrMap<Decoder::InstBytes> DecodePages;
     DecodePages *decodePages = nullptr;
     typedef std::unordered_map<CacheKey, DecodePages *> AddrCacheMap;
     AddrCacheMap addrCacheMap;
 
-    DecodeCache::InstMap<ExtMachInst> *instMap = nullptr;
+    decode_cache::InstMap<ExtMachInst> *instMap = nullptr;
     typedef std::unordered_map<
-            CacheKey, DecodeCache::InstMap<ExtMachInst> *> InstCacheMap;
+            CacheKey, decode_cache::InstMap<ExtMachInst> *> InstCacheMap;
     static InstCacheMap instCacheMap;
 
+    StaticInstPtr decodeInst(ExtMachInst mach_inst);
+
+    /// Decode a machine instruction.
+    /// @param mach_inst The binary instruction to decode.
+    /// @retval A pointer to the corresponding StaticInst object.
+    StaticInstPtr decode(ExtMachInst mach_inst, Addr addr);
+
+    void process();
+
   public:
-    Decoder(ISA *isa=nullptr)
+    Decoder(const X86DecoderParams &p) : InstDecoder(p, &fetchChunk)
     {
         emi.reset();
         emi.mode.mode = mode;
@@ -274,44 +286,49 @@ class Decoder : public InstDecoder
         if (imIter != instCacheMap.end()) {
             instMap = imIter->second;
         } else {
-            instMap = new DecodeCache::InstMap<ExtMachInst>;
+            instMap = new decode_cache::InstMap<ExtMachInst>;
             instCacheMap[m5Reg] = instMap;
         }
     }
 
     void
-    takeOverFrom(Decoder *old)
+    takeOverFrom(InstDecoder *old) override
     {
-        mode = old->mode;
-        submode = old->submode;
+        InstDecoder::takeOverFrom(old);
+
+        Decoder *dec = dynamic_cast<Decoder *>(old);
+        assert(dec);
+
+        mode = dec->mode;
+        submode = dec->submode;
         emi.mode.mode = mode;
         emi.mode.submode = submode;
-        altOp = old->altOp;
-        defOp = old->defOp;
-        altAddr = old->altAddr;
-        defAddr = old->defAddr;
-        stack = old->stack;
+        altOp = dec->altOp;
+        defOp = dec->defOp;
+        altAddr = dec->altAddr;
+        defAddr = dec->defAddr;
+        stack = dec->stack;
     }
 
-    void reset() { state = ResetState; }
-
-    void process();
+    void
+    reset() override
+    {
+        InstDecoder::reset();
+        state = ResetState;
+    }
 
     // Use this to give data to the decoder. This should be used
     // when there is control flow.
     void
-    moreBytes(const PCState &pc, Addr fetchPC, MachInst data)
+    moreBytes(const PCStateBase &pc, Addr fetchPC) override
     {
         DPRINTF(Decoder, "Getting more bytes.\n");
         basePC = fetchPC;
         offset = (fetchPC >= pc.instAddr()) ? 0 : pc.instAddr() - fetchPC;
-        fetchChunk = letoh(data);
+        fetchChunk = letoh(fetchChunk);
         outOfBytes = false;
         process();
     }
-
-    bool needMoreBytes() { return outOfBytes; }
-    bool instReady() { return instDone; }
 
     void
     updateNPC(X86ISA::PCState &nextPC)
@@ -328,18 +345,13 @@ class Decoder : public InstDecoder
     }
 
   public:
-    StaticInstPtr decodeInst(ExtMachInst mach_inst);
-
-    /// Decode a machine instruction.
-    /// @param mach_inst The binary instruction to decode.
-    /// @retval A pointer to the corresponding StaticInst object.
-    StaticInstPtr decode(ExtMachInst mach_inst, Addr addr);
-    StaticInstPtr decode(X86ISA::PCState &nextPC);
+    StaticInstPtr decode(PCStateBase &next_pc) override;
 
     StaticInstPtr fetchRomMicroop(
             MicroPC micropc, StaticInstPtr curMacroop) override;
 };
 
 } // namespace X86ISA
+} // namespace gem5
 
 #endif // __ARCH_X86_DECODER_HH__

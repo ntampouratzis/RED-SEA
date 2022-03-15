@@ -42,8 +42,10 @@
 #ifndef __CPU_SIMPLE_BASE_HH__
 #define __CPU_SIMPLE_BASE_HH__
 
+#include <memory>
+
+#include "arch/generic/pcstate.hh"
 #include "base/statistics.hh"
-#include "config/the_isa.hh"
 #include "cpu/base.hh"
 #include "cpu/checker/cpu.hh"
 #include "cpu/exec_context.hh"
@@ -57,31 +59,34 @@
 #include "sim/full_system.hh"
 #include "sim/system.hh"
 
+namespace gem5
+{
+
 // forward declarations
 class Checkpoint;
 class Process;
 class Processor;
 class ThreadContext;
 
-namespace TheISA
+namespace Trace
 {
-    class DTB;
-    class ITB;
-}
-
-namespace Trace {
     class InstRecord;
 }
 
 struct BaseSimpleCPUParams;
-class BPredUnit;
+namespace branch_prediction
+{
+    class BPredUnit;
+} // namespace branch_prediction
 class SimpleExecContext;
 
 class BaseSimpleCPU : public BaseCPU
 {
   protected:
     ThreadID curThread;
-    BPredUnit *branchPred;
+    branch_prediction::BPredUnit *branchPred;
+
+    const RegIndex zeroReg;
 
     void checkPcEventQueue();
     void swapActiveThread();
@@ -90,7 +95,6 @@ class BaseSimpleCPU : public BaseCPU
     BaseSimpleCPU(const BaseSimpleCPUParams &params);
     virtual ~BaseSimpleCPU();
     void wakeup(ThreadID tid) override;
-    void init() override;
   public:
     Trace::InstRecord *traceData;
     CheckerCPU *checker;
@@ -99,12 +103,12 @@ class BaseSimpleCPU : public BaseCPU
     std::list<ThreadID> activeThreads;
 
     /** Current instruction */
-    TheISA::MachInst inst;
     StaticInstPtr curStaticInst;
     StaticInstPtr curMacroStaticInst;
 
   protected:
-    enum Status {
+    enum Status
+    {
         Idle,
         Running,
         Faulting,
@@ -128,9 +132,12 @@ class BaseSimpleCPU : public BaseCPU
      */
     void traceFault();
 
+    std::unique_ptr<PCStateBase> preExecuteTempPC;
+
   public:
     void checkForInterrupts();
     void setupFetchRequest(const RequestPtr &req);
+    void serviceInstCountEvents();
     void preExecute();
     void postExecute();
     void advancePC(const Fault &fault);
@@ -140,33 +147,41 @@ class BaseSimpleCPU : public BaseCPU
     // statistics
     void resetStats() override;
 
-    virtual Fault readMem(Addr addr, uint8_t* data, unsigned size,
-                          Request::Flags flags,
-                          const std::vector<bool>& byte_enable =
-                              std::vector<bool>())
-    { panic("readMem() is not implemented\n"); }
+    virtual Fault
+    readMem(Addr addr, uint8_t* data, unsigned size, Request::Flags flags,
+            const std::vector<bool>& byte_enable=std::vector<bool>())
+    {
+        panic("readMem() is not implemented");
+    }
 
-    virtual Fault initiateMemRead(Addr addr, unsigned size,
-                                  Request::Flags flags,
-                                  const std::vector<bool>& byte_enable =
-                                      std::vector<bool>())
-    { panic("initiateMemRead() is not implemented\n"); }
+    virtual Fault
+    initiateMemRead(Addr addr, unsigned size, Request::Flags flags,
+            const std::vector<bool>& byte_enable=std::vector<bool>())
+    {
+        panic("initiateMemRead() is not implemented\n");
+    }
 
-    virtual Fault writeMem(uint8_t* data, unsigned size, Addr addr,
-                           Request::Flags flags, uint64_t* res,
-                           const std::vector<bool>& byte_enable =
-                               std::vector<bool>())
-    { panic("writeMem() is not implemented\n"); }
+    virtual Fault
+    writeMem(uint8_t* data, unsigned size, Addr addr, Request::Flags flags,
+            uint64_t* res,
+            const std::vector<bool>& byte_enable=std::vector<bool>())
+    {
+        panic("writeMem() is not implemented\n");
+    }
 
-    virtual Fault amoMem(Addr addr, uint8_t* data, unsigned size,
-                         Request::Flags flags,
-                         AtomicOpFunctorPtr amo_op)
-    { panic("amoMem() is not implemented\n"); }
+    virtual Fault
+    amoMem(Addr addr, uint8_t* data, unsigned size, Request::Flags flags,
+            AtomicOpFunctorPtr amo_op)
+    {
+        panic("amoMem() is not implemented\n");
+    }
 
-    virtual Fault initiateMemAMO(Addr addr, unsigned size,
-                                 Request::Flags flags,
-                                 AtomicOpFunctorPtr amo_op)
-    { panic("initiateMemAMO() is not implemented\n"); }
+    virtual Fault
+    initiateMemAMO(Addr addr, unsigned size, Request::Flags flags,
+            AtomicOpFunctorPtr amo_op)
+    {
+        panic("initiateMemAMO() is not implemented\n");
+    }
 
     void countInst();
     Counter totalInsts() const override;
@@ -180,16 +195,8 @@ class BaseSimpleCPU : public BaseCPU
      * neither really (true) loads nor stores. For this reason the interface
      * is extended and initiateHtmCmd() is used to instigate the command. */
     virtual Fault initiateHtmCmd(Request::Flags flags) = 0;
-
-    /** This function is used to instruct the memory subsystem that a
-     * transaction should be aborted and the speculative state should be
-     * thrown away.  This is called in the transaction's very last breath in
-     * the core.  Afterwards, the core throws away its speculative state and
-     * resumes execution at the point the transaction started, i.e. reverses
-     * time.  When instruction execution resumes, the core expects the
-     * memory subsystem to be in a stable, i.e. pre-speculative, state as
-     * well. */
-    virtual void htmSendAbortSignal(HtmFailureFaultCause cause) = 0;
 };
+
+} // namespace gem5
 
 #endif // __CPU_SIMPLE_BASE_HH__

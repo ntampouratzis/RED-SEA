@@ -34,6 +34,9 @@
 #include "enums/X86I8259CascadeMode.hh"
 #include "params/I8259.hh"
 
+namespace gem5
+{
+
 namespace X86ISA
 {
 
@@ -48,7 +51,7 @@ class I8259 : public BasicPioDevice
     Tick latency;
     std::vector<IntSourcePin<I8259> *> output;
     std::vector<IntSinkPin<I8259> *> inputs;
-    Enums::X86I8259CascadeMode mode;
+    enums::X86I8259CascadeMode mode;
     I8259 *slave;
 
     // Interrupt Request Register
@@ -121,5 +124,6 @@ class I8259 : public BasicPioDevice
 };
 
 } // namespace X86ISA
+} // namespace gem5
 
 #endif //__DEV_X86_I8259_HH__

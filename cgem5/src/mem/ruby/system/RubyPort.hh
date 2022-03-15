@@ -53,6 +53,12 @@
 #include "params/RubyPort.hh"
 #include "sim/clocked_object.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 class AbstractController;
 
 class RubyPort : public ClockedObject
@@ -99,6 +105,7 @@ class RubyPort : public ClockedObject
         void addToRetryList();
 
       private:
+        bool isShadowRomAddress(Addr addr) const;
         bool isPhysMemAddress(PacketPtr pkt) const;
     };
 
@@ -224,5 +231,8 @@ class RubyPort : public ClockedObject
 
     bool m_isCPUSequencer;
 };
+
+} // namespace ruby
+} // namespace gem5
 
 #endif // __MEM_RUBY_SYSTEM_RUBYPORT_HH__

@@ -35,6 +35,9 @@
 #include "debug/Decode.hh"
 #include "debug/Decoder.hh"
 
+namespace gem5
+{
+
 namespace X86ISA
 {
 
@@ -691,12 +694,12 @@ Decoder::decode(ExtMachInst mach_inst, Addr addr)
 }
 
 StaticInstPtr
-Decoder::decode(PCState &nextPC)
+Decoder::decode(PCStateBase &next_pc)
 {
     if (!instDone)
         return NULL;
     instDone = false;
-    updateNPC(nextPC);
+    updateNPC(next_pc.as<PCState>());
 
     StaticInstPtr &si = instBytes->si;
     if (si)
@@ -740,4 +743,5 @@ Decoder::fetchRomMicroop(MicroPC micropc, StaticInstPtr curMacroop)
     return microcodeRom.fetchMicroop(micropc, curMacroop);
 }
 
-}
+} // namespace X86ISA
+} // namespace gem5

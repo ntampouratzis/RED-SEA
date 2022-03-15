@@ -40,11 +40,15 @@
 #define __ARCH_X86_LINUX_SE_WORKLOAD_HH__
 
 #include "arch/x86/linux/linux.hh"
+#include "arch/x86/remote_gdb.hh"
 #include "params/X86EmuLinux.hh"
 #include "sim/process.hh"
 #include "sim/se_workload.hh"
 #include "sim/syscall_abi.hh"
 #include "sim/syscall_desc.hh"
+
+namespace gem5
+{
 
 namespace X86ISA
 {
@@ -56,7 +60,15 @@ class EmuLinux : public SEWorkload
 
     EmuLinux(const Params &p);
 
-    ::Loader::Arch getArch() const override { return ::Loader::X86_64; }
+    void
+    setSystem(System *sys) override
+    {
+        SEWorkload::setSystem(sys);
+        gdb = BaseRemoteGDB::build<RemoteGDB>(system);
+    }
+
+    loader::Arch getArch() const override { return loader::X86_64; }
+    ByteOrder byteOrder() const override { return ByteOrder::little; }
 
     void syscall(ThreadContext *tc) override;
     void event(ThreadContext *tc) override;
@@ -82,13 +94,14 @@ class EmuLinux : public SEWorkload
 
 } // namespace X86ISA
 
-namespace GuestABI
+GEM5_DEPRECATED_NAMESPACE(GuestABI, guest_abi);
+namespace guest_abi
 {
 
 template <typename Arg>
 struct Argument<X86ISA::EmuLinux::SyscallABI32, Arg,
-    typename std::enable_if_t<std::is_integral<Arg>::value &&
-        X86ISA::EmuLinux::SyscallABI32::IsWide<Arg>::value>>
+    typename std::enable_if_t<std::is_integral_v<Arg> &&
+        X86ISA::EmuLinux::SyscallABI32::IsWideV<Arg>>>
 {
     using ABI = X86ISA::EmuLinux::SyscallABI32;
 
@@ -103,6 +116,7 @@ struct Argument<X86ISA::EmuLinux::SyscallABI32, Arg,
     }
 };
 
-} // namespace GuestABI
+} // namespace guest_abi
+} // namespace gem5
 
 #endif // __ARCH_X86_LINUX_SE_WORKLOAD_HH__

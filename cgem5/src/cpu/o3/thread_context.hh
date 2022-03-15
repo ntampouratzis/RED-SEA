@@ -43,8 +43,14 @@
 #define __CPU_O3_THREAD_CONTEXT_HH__
 
 #include "config/the_isa.hh"
-#include "cpu/o3/isa_specific.hh"
+#include "cpu/o3/cpu.hh"
 #include "cpu/thread_context.hh"
+
+namespace gem5
+{
+
+namespace o3
+{
 
 /**
  * Derived ThreadContext class for use with the O3CPU.  It
@@ -54,19 +60,16 @@
  * the CPU will create an event to squash all in-flight
  * instructions in order to ensure state is maintained correctly.
  * It must be defined specifically for the O3CPU because
- * not all architectural state is located within the O3ThreadState
+ * not all architectural state is located within the ThreadState
  * (such as the commit PC, and registers), and specific actions
  * must be taken when using this interface (such as squashing all
  * in-flight instructions when doing a write to this interface).
  */
-template <class Impl>
-class O3ThreadContext : public ThreadContext
+class ThreadContext : public gem5::ThreadContext
 {
   public:
-    typedef typename Impl::O3CPU O3CPU;
-
    /** Pointer to the CPU. */
-    O3CPU *cpu;
+    CPU *cpu;
 
     bool
     schedule(PCEvent *e) override
@@ -96,7 +99,7 @@ class O3ThreadContext : public ThreadContext
     }
 
     /** Pointer to the thread state that this TC corrseponds to. */
-    O3ThreadState<Impl> *thread;
+    ThreadState *thread;
 
     /** Returns a pointer to the MMU. */
     BaseMMU *getMMUPtr() override { return cpu->mmu; }
@@ -109,7 +112,7 @@ class O3ThreadContext : public ThreadContext
         return cpu->isa[thread->threadId()];
     }
 
-    TheISA::Decoder *
+    InstDecoder *
     getDecoderPtr() override
     {
         return cpu->fetch.decoder[thread->threadId()];
@@ -140,16 +143,6 @@ class O3ThreadContext : public ThreadContext
 
     void setProcessPtr(Process *p) override { thread->setProcessPtr(p); }
 
-    PortProxy &getPhysProxy() override { return thread->getPhysProxy(); }
-
-    PortProxy &getVirtProxy() override;
-
-    void
-    initMemProxies(ThreadContext *tc) override
-    {
-        thread->initMemProxies(tc);
-    }
-
     /** Returns this thread's status. */
     Status status() const override { return thread->status(); }
 
@@ -170,7 +163,7 @@ class O3ThreadContext : public ThreadContext
     void halt() override;
 
     /** Takes over execution of a thread from another CPU. */
-    void takeOverFrom(ThreadContext *old_context) override;
+    void takeOverFrom(gem5::ThreadContext *old_context) override;
 
     /** Reads the last tick that this thread was activated on. */
     Tick readLastActivate() override;
@@ -178,7 +171,7 @@ class O3ThreadContext : public ThreadContext
     Tick readLastSuspend() override;
 
     /** Copies the architectural registers from another TC into this TC. */
-    void copyArchRegs(ThreadContext *tc) override;
+    void copyArchRegs(gem5::ThreadContext *tc) override;
 
     /** Resets all architectural registers to 0. */
     void clearArchRegs() override;
@@ -219,68 +212,7 @@ class O3ThreadContext : public ThreadContext
         return getWritableVecRegFlat(flattenRegId(id).index());
     }
 
-    /** Vector Register Lane Interfaces. */
-    /** @{ */
-    /** Reads source vector 8bit operand. */
-    ConstVecLane8
-    readVec8BitLaneReg(const RegId& id) const override
-    {
-        return readVecLaneFlat<uint8_t>(flattenRegId(id).index(),
-                    id.elemIndex());
-    }
-
-    /** Reads source vector 16bit operand. */
-    ConstVecLane16
-    readVec16BitLaneReg(const RegId& id) const override
-    {
-        return readVecLaneFlat<uint16_t>(flattenRegId(id).index(),
-                    id.elemIndex());
-    }
-
-    /** Reads source vector 32bit operand. */
-    ConstVecLane32
-    readVec32BitLaneReg(const RegId& id) const override
-    {
-        return readVecLaneFlat<uint32_t>(flattenRegId(id).index(),
-                    id.elemIndex());
-    }
-
-    /** Reads source vector 64bit operand. */
-    ConstVecLane64
-    readVec64BitLaneReg(const RegId& id) const override
-    {
-        return readVecLaneFlat<uint64_t>(flattenRegId(id).index(),
-                    id.elemIndex());
-    }
-
-    /** Write a lane of the destination vector register. */
-    void
-    setVecLane(const RegId& reg,
-               const LaneData<LaneSize::Byte>& val) override
-    {
-        return setVecLaneFlat(flattenRegId(reg).index(), reg.elemIndex(), val);
-    }
-    void
-    setVecLane(const RegId& reg,
-               const LaneData<LaneSize::TwoByte>& val) override
-    {
-        return setVecLaneFlat(flattenRegId(reg).index(), reg.elemIndex(), val);
-    }
-    void
-    setVecLane(const RegId& reg,
-               const LaneData<LaneSize::FourByte>& val) override
-    {
-        return setVecLaneFlat(flattenRegId(reg).index(), reg.elemIndex(), val);
-    }
-    void
-    setVecLane(const RegId& reg,
-               const LaneData<LaneSize::EightByte>& val) override
-    {
-        return setVecLaneFlat(flattenRegId(reg).index(), reg.elemIndex(), val);
-    }
-    /** @} */
-
-    const TheISA::VecElem &
+    RegVal
     readVecElem(const RegId& reg) const override
     {
         return readVecElemFlat(flattenRegId(reg).index(), reg.elemIndex());
@@ -326,7 +258,7 @@ class O3ThreadContext : public ThreadContext
     }
 
     void
-    setVecElem(const RegId& reg, const TheISA::VecElem& val) override
+    setVecElem(const RegId& reg, RegVal val) override
     {
         setVecElemFlat(flattenRegId(reg).index(), reg.elemIndex(), val);
     }
@@ -345,37 +277,16 @@ class O3ThreadContext : public ThreadContext
     }
 
     /** Reads this thread's PC state. */
-    TheISA::PCState
+    const PCStateBase &
     pcState() const override
     {
         return cpu->pcState(thread->threadId());
     }
 
     /** Sets this thread's PC state. */
-    void pcState(const TheISA::PCState &val) override;
+    void pcState(const PCStateBase &val) override;
 
-    void pcStateNoRecord(const TheISA::PCState &val) override;
-
-    /** Reads this thread's PC. */
-    Addr
-    instAddr() const override
-    {
-        return cpu->instAddr(thread->threadId());
-    }
-
-    /** Reads this thread's next PC. */
-    Addr
-    nextInstAddr() const override
-    {
-        return cpu->nextInstAddr(thread->threadId());
-    }
-
-    /** Reads this thread's next PC. */
-    MicroPC
-    microPC() const override
-    {
-        return cpu->microPC(thread->threadId());
-    }
+    void pcStateNoRecord(const PCStateBase &val) override;
 
     /** Reads a miscellaneous register. */
     RegVal
@@ -416,15 +327,12 @@ class O3ThreadContext : public ThreadContext
         thread->storeCondFailures = sc_failures;
     }
 
-    /** Reads the funcExeInst counter. */
-    Counter readFuncExeInst() const override { return thread->funcExeInst; }
-
     /** check if the cpu is currently in state update mode and squash if not.
      * This function will return true if a trap is pending or if a fault or
      * similar is currently writing to the thread context and doesn't want
      * reset all the state (see noSquashFromTC).
      */
-    inline void
+    void
     conditionalSquash()
     {
         if (!thread->trapPending && !thread->noSquashFromTC)
@@ -443,25 +351,10 @@ class O3ThreadContext : public ThreadContext
     void setVecRegFlat(RegIndex idx,
             const TheISA::VecRegContainer& val) override;
 
-    template <typename VE>
-    VecLaneT<VE, true>
-    readVecLaneFlat(RegIndex idx, int lId) const
-    {
-        return cpu->template readArchVecLane<VE>(idx, lId,
-                thread->threadId());
-    }
-
-    template <typename LD>
-    void
-    setVecLaneFlat(int idx, int lId, const LD& val)
-    {
-        cpu->template setArchVecLane(idx, lId, thread->threadId(), val);
-    }
-
-    const TheISA::VecElem &readVecElemFlat(RegIndex idx,
+    RegVal readVecElemFlat(RegIndex idx,
             const ElemIndex& elemIndex) const override;
     void setVecElemFlat(RegIndex idx, const ElemIndex& elemIdx,
-                        const TheISA::VecElem& val) override;
+                        RegVal val) override;
 
     const TheISA::VecPredRegContainer&
         readVecPredRegFlat(RegIndex idx) const override;
@@ -479,5 +372,8 @@ class O3ThreadContext : public ThreadContext
     BaseHTMCheckpointPtr& getHtmCheckpointPtr() override;
     void setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override;
 };
+
+} // namespace o3
+} // namespace gem5
 
 #endif

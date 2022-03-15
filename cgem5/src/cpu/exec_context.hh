@@ -42,7 +42,7 @@
 #ifndef __CPU_EXEC_CONTEXT_HH__
 #define __CPU_EXEC_CONTEXT_HH__
 
-#include "arch/registers.hh"
+#include "arch/vecregs.hh"
 #include "base/types.hh"
 #include "config/the_isa.hh"
 #include "cpu/base.hh"
@@ -50,6 +50,9 @@
 #include "cpu/static_inst_fwd.hh"
 #include "cpu/translation.hh"
 #include "mem/request.hh"
+
+namespace gem5
+{
 
 /**
  * The ExecContext is an abstract base class the provides the
@@ -117,45 +120,14 @@ class ExecContext
             const TheISA::VecRegContainer& val) = 0;
     /** @} */
 
-    /** Vector Register Lane Interfaces. */
-    /** @{ */
-    /** Reads source vector 8bit operand. */
-    virtual ConstVecLane8 readVec8BitLaneOperand(
-            const StaticInst *si, int idx) const = 0;
-
-    /** Reads source vector 16bit operand. */
-    virtual ConstVecLane16 readVec16BitLaneOperand(
-            const StaticInst *si, int idx) const = 0;
-
-    /** Reads source vector 32bit operand. */
-    virtual ConstVecLane32 readVec32BitLaneOperand(
-            const StaticInst *si, int idx) const = 0;
-
-    /** Reads source vector 64bit operand. */
-    virtual ConstVecLane64 readVec64BitLaneOperand(
-            const StaticInst *si, int idx) const = 0;
-
-    /** Write a lane of the destination vector operand. */
-    /** @{ */
-    virtual void setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::Byte>& val) = 0;
-    virtual void setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::TwoByte>& val) = 0;
-    virtual void setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::FourByte>& val) = 0;
-    virtual void setVecLaneOperand(const StaticInst *si, int idx,
-            const LaneData<LaneSize::EightByte>& val) = 0;
-    /** @} */
-
     /** Vector Elem Interfaces. */
     /** @{ */
     /** Reads an element of a vector register. */
-    virtual TheISA::VecElem readVecElemOperand(
-            const StaticInst *si, int idx) const = 0;
+    virtual RegVal readVecElemOperand(const StaticInst *si, int idx) const = 0;
 
     /** Sets a vector register to a value. */
     virtual void setVecElemOperand(
-            const StaticInst *si, int idx, const TheISA::VecElem val) = 0;
+            const StaticInst *si, int idx, RegVal val) = 0;
     /** @} */
 
     /** Predicate registers interface. */
@@ -209,8 +181,8 @@ class ExecContext
      * @{
      * @name PC Control
      */
-    virtual TheISA::PCState pcState() const = 0;
-    virtual void pcState(const TheISA::PCState &val) = 0;
+    virtual const PCStateBase &pcState() const = 0;
+    virtual void pcState(const PCStateBase &val) = 0;
     /** @} */
 
     /**
@@ -329,5 +301,7 @@ class ExecContext
 
     /** @} */
 };
+
+} // namespace gem5
 
 #endif // __CPU_EXEC_CONTEXT_HH__

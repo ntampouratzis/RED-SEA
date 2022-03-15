@@ -38,6 +38,9 @@
 #include "cpu/thread_context.hh"
 #include "sim/syscall_emul.hh"
 
+namespace gem5
+{
+
 namespace
 {
 
@@ -45,30 +48,30 @@ class LinuxLoader : public Process::Loader
 {
   public:
     Process *
-    load(const ProcessParams &params, ::Loader::ObjectFile *obj) override
+    load(const ProcessParams &params, loader::ObjectFile *obj) override
     {
         auto arch = obj->getArch();
         auto opsys = obj->getOpSys();
 
-        if (arch != ::Loader::Riscv64 && arch != ::Loader::Riscv32)
+        if (arch != loader::Riscv64 && arch != loader::Riscv32)
             return nullptr;
 
-        if (opsys == ::Loader::UnknownOpSys) {
+        if (opsys == loader::UnknownOpSys) {
             warn("Unknown operating system; assuming Linux.");
-            opsys = ::Loader::Linux;
+            opsys = loader::Linux;
         }
 
-        if (opsys != ::Loader::Linux)
+        if (opsys != loader::Linux)
             return nullptr;
 
-        if (arch == ::Loader::Riscv64)
+        if (arch == loader::Riscv64)
             return new RiscvProcess64(params, obj);
         else
             return new RiscvProcess32(params, obj);
     }
 };
 
-LinuxLoader loader;
+LinuxLoader linuxLoader;
 
 } // anonymous namespace
 
@@ -166,9 +169,9 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs64 = {
     { 42,   "nfsservctl" },
     { 43,   "statfs", statfsFunc<RiscvLinux64> },
     { 44,   "fstatfs", fstatfsFunc<RiscvLinux64> },
-    { 45,   "truncate", truncateFunc },
+    { 45,   "truncate", truncateFunc<RiscvLinux64> },
     { 46,   "ftruncate", ftruncate64Func },
-    { 47,   "fallocate", fallocateFunc },
+    { 47,   "fallocate", fallocateFunc<RiscvLinux64> },
     { 48,   "faccessat", faccessatFunc<RiscvLinux64> },
     { 49,   "chdir" },
     { 50,   "fchdir" },
@@ -335,7 +338,7 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs64 = {
     { 212,  "recvmsg" },
     { 213,  "readahead" },
     { 214,  "brk", brkFunc },
-    { 215,  "munmap", munmapFunc },
+    { 215,  "munmap", munmapFunc<RiscvLinux64> },
     { 216,  "mremap", mremapFunc<RiscvLinux64> },
     { 217,  "add_key" },
     { 218,  "request_key" },
@@ -403,7 +406,7 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs64 = {
     { 1032, "lchown" },
     { 1033, "access", accessFunc },
     { 1034, "rename", renameFunc },
-    { 1035, "readlink", readlinkFunc },
+    { 1035, "readlink", readlinkFunc<RiscvLinux64> },
     { 1036, "symlink" },
     { 1037, "utimes", utimesFunc<RiscvLinux64> },
     { 1038, "stat", stat64Func<RiscvLinux64> },
@@ -497,9 +500,9 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs32 = {
     { 42,   "nfsservctl" },
     { 43,   "statfs", statfsFunc<RiscvLinux32> },
     { 44,   "fstatfs", fstatfsFunc<RiscvLinux32> },
-    { 45,   "truncate", truncateFunc },
-    { 46,   "ftruncate", ftruncateFunc },
-    { 47,   "fallocate", fallocateFunc },
+    { 45,   "truncate", truncateFunc<RiscvLinux32> },
+    { 46,   "ftruncate", ftruncateFunc<RiscvLinux32> },
+    { 47,   "fallocate", fallocateFunc<RiscvLinux32> },
     { 48,   "faccessat", faccessatFunc<RiscvLinux32> },
     { 49,   "chdir" },
     { 50,   "fchdir" },
@@ -666,7 +669,7 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs32 = {
     { 212,  "recvmsg" },
     { 213,  "readahead" },
     { 214,  "brk", brkFunc },
-    { 215,  "munmap", munmapFunc },
+    { 215,  "munmap", munmapFunc<RiscvLinux32> },
     { 216,  "mremap", mremapFunc<RiscvLinux32> },
     { 217,  "add_key" },
     { 218,  "request_key" },
@@ -734,7 +737,7 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs32 = {
     { 1032, "lchown" },
     { 1033, "access", accessFunc },
     { 1034, "rename", renameFunc },
-    { 1035, "readlink", readlinkFunc },
+    { 1035, "readlink", readlinkFunc<RiscvLinux32> },
     { 1036, "symlink" },
     { 1037, "utimes", utimesFunc<RiscvLinux32> },
     { 1038, "stat", statFunc<RiscvLinux32> },
@@ -746,8 +749,8 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs32 = {
     { 1044, "eventfd" },
     { 1045, "signalfd" },
     { 1046, "sendfile" },
-    { 1047, "ftruncate", ftruncateFunc },
-    { 1048, "truncate", truncateFunc },
+    { 1047, "ftruncate", ftruncateFunc<RiscvLinux32> },
+    { 1048, "truncate", truncateFunc<RiscvLinux32> },
     { 1049, "stat", statFunc<RiscvLinux32> },
     { 1050, "lstat", lstatFunc<RiscvLinux32> },
     { 1051, "fstat", fstatFunc<RiscvLinux32> },
@@ -783,3 +786,4 @@ SyscallDescTable<SEWorkload::SyscallABI> EmuLinux::syscallDescs32 = {
 };
 
 } // namespace RiscvISA
+} // namespace gem5

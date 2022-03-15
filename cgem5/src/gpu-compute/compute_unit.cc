@@ -2,8 +2,6 @@
  * Copyright (c) 2011-2015 Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * For use for simulation and test purposes only
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -35,7 +33,7 @@
 
 #include <limits>
 
-#include "arch/x86/isa_traits.hh"
+#include "arch/amdgpu/common/tlb.hh"
 #include "base/output.hh"
 #include "debug/GPUDisp.hh"
 #include "debug/GPUExec.hh"
@@ -48,6 +46,7 @@
 #include "debug/GPUSync.hh"
 #include "debug/GPUTLB.hh"
 #include "gpu-compute/dispatcher.hh"
+#include "gpu-compute/gpu_command_processor.hh"
 #include "gpu-compute/gpu_dyn_inst.hh"
 #include "gpu-compute/gpu_static_inst.hh"
 #include "gpu-compute/scalar_register_file.hh"
@@ -58,6 +57,9 @@
 #include "mem/page_table.hh"
 #include "sim/process.hh"
 #include "sim/sim_exit.hh"
+
+namespace gem5
+{
 
 ComputeUnit::ComputeUnit(const Params &p) : ClockedObject(p),
     numVectorGlobalMemUnits(p.num_global_mem_pipes),
@@ -351,7 +353,7 @@ ComputeUnit::startWavefront(Wavefront *w, int waveId, LdsChunk *ldsChunk,
     // set the wavefront context to have a pointer to this section of the LDS
     w->ldsChunk = ldsChunk;
 
-    M5_VAR_USED int32_t refCount =
+    [[maybe_unused]] int32_t refCount =
                 lds.increaseRefCounter(w->dispatchId, w->wgId);
     DPRINTF(GPUDisp, "CU%d: increase ref ctr wg[%d] to [%d]\n",
                     cu_id, w->wgId, refCount);
@@ -955,7 +957,7 @@ ComputeUnit::DataPort::recvReqRetry()
 
     for (int i = 0; i < len; ++i) {
         PacketPtr pkt = retries.front().first;
-        M5_VAR_USED GPUDynInstPtr gpuDynInst = retries.front().second;
+        [[maybe_unused]] GPUDynInstPtr gpuDynInst = retries.front().second;
         DPRINTF(GPUMem, "CU%d: WF[%d][%d]: retry mem inst addr %#x\n",
                 computeUnit->cu_id, gpuDynInst->simdId, gpuDynInst->wfSlotId,
                 pkt->req->getPaddr());
@@ -989,7 +991,7 @@ ComputeUnit::SQCPort::recvReqRetry()
 
     for (int i = 0; i < len; ++i) {
         PacketPtr pkt = retries.front().first;
-        M5_VAR_USED Wavefront *wavefront = retries.front().second;
+        [[maybe_unused]] Wavefront *wavefront = retries.front().second;
         DPRINTF(GPUFetch, "CU%d: WF[%d][%d]: retrying FETCH addr %#x\n",
                 computeUnit->cu_id, wavefront->simdId, wavefront->wfSlotId,
                 pkt->req->getPaddr());
@@ -1017,18 +1019,26 @@ ComputeUnit::sendRequest(GPUDynInstPtr gpuDynInst, PortID index, PacketPtr pkt)
     pkt->req->setReqInstSeqNum(gpuDynInst->seqNum());
 
     // figure out the type of the request to set read/write
-    BaseTLB::Mode TLB_mode;
+    BaseMMU::Mode TLB_mode;
     assert(pkt->isRead() || pkt->isWrite());
 
     // only do some things if actually accessing data
     bool isDataAccess = pkt->isWrite() || pkt->isRead();
 
+    // For dGPUs, real hardware will extract MTYPE from the PTE.  Our model
+    // uses x86 pagetables which don't have fields to track GPU MTYPEs.
+    // Rather than hacking up the pagetable to add these bits in, we just
+    // keep a structure local to our GPUs that are populated in our
+    // emulated driver whenever memory is allocated.  Consult that structure
+    // here in case we need a memtype override.
+    shader->gpuCmdProc.driver()->setMtype(pkt->req);
+
     // Check write before read for atomic operations
-    // since atomic operations should use BaseTLB::Write
+    // since atomic operations should use BaseMMU::Write
     if (pkt->isWrite()) {
-        TLB_mode = BaseTLB::Write;
+        TLB_mode = BaseMMU::Write;
     } else if (pkt->isRead()) {
-        TLB_mode = BaseTLB::Read;
+        TLB_mode = BaseMMU::Read;
     } else {
         fatal("pkt is not a read nor a write\n");
     }
@@ -1064,8 +1074,8 @@ ComputeUnit::sendRequest(GPUDynInstPtr gpuDynInst, PortID index, PacketPtr pkt)
         pkt->senderState = new DTLBPort::SenderState(gpuDynInst, index);
 
         // This is the senderState needed by the TLB hierarchy to function
-        X86ISA::GpuTLB::TranslationState *translation_state =
-          new X86ISA::GpuTLB::TranslationState(TLB_mode, shader->gpuTc, false,
+        GpuTranslationState *translation_state =
+          new GpuTranslationState(TLB_mode, shader->gpuTc, false,
                                                pkt->senderState);
 
         pkt->senderState = translation_state;
@@ -1079,8 +1089,8 @@ ComputeUnit::sendRequest(GPUDynInstPtr gpuDynInst, PortID index, PacketPtr pkt)
             stats.hitsPerTLBLevel[hit_level]++;
 
             // New SenderState for the memory access
-            X86ISA::GpuTLB::TranslationState *sender_state =
-                safe_cast<X86ISA::GpuTLB::TranslationState*>(pkt->senderState);
+            GpuTranslationState *sender_state =
+                safe_cast<GpuTranslationState*>(pkt->senderState);
 
             delete sender_state->tlbEntry;
             delete sender_state->saved;
@@ -1157,7 +1167,7 @@ ComputeUnit::sendRequest(GPUDynInstPtr gpuDynInst, PortID index, PacketPtr pkt)
         delete pkt->senderState;
 
         // Because it's atomic operation, only need TLB translation state
-        pkt->senderState = new X86ISA::GpuTLB::TranslationState(TLB_mode,
+        pkt->senderState = new GpuTranslationState(TLB_mode,
                                                                 shader->gpuTc);
 
         tlbPort[tlbPort_index].sendFunctional(pkt);
@@ -1178,8 +1188,8 @@ ComputeUnit::sendRequest(GPUDynInstPtr gpuDynInst, PortID index, PacketPtr pkt)
                 new_pkt->req->getPaddr());
 
         // safe_cast the senderState
-        X86ISA::GpuTLB::TranslationState *sender_state =
-             safe_cast<X86ISA::GpuTLB::TranslationState*>(pkt->senderState);
+        GpuTranslationState *sender_state =
+             safe_cast<GpuTranslationState*>(pkt->senderState);
 
         delete sender_state->tlbEntry;
         delete new_pkt;
@@ -1193,13 +1203,13 @@ ComputeUnit::sendScalarRequest(GPUDynInstPtr gpuDynInst, PacketPtr pkt)
 {
     assert(pkt->isWrite() || pkt->isRead());
 
-    BaseTLB::Mode tlb_mode = pkt->isRead() ? BaseTLB::Read : BaseTLB::Write;
+    BaseMMU::Mode tlb_mode = pkt->isRead() ? BaseMMU::Read : BaseMMU::Write;
 
     pkt->senderState =
         new ComputeUnit::ScalarDTLBPort::SenderState(gpuDynInst);
 
     pkt->senderState =
-        new X86ISA::GpuTLB::TranslationState(tlb_mode, shader->gpuTc, false,
+        new GpuTranslationState(tlb_mode, shader->gpuTc, false,
                                              pkt->senderState);
 
     if (scalarDTLBPort.isStalled()) {
@@ -1210,7 +1220,7 @@ ComputeUnit::sendScalarRequest(GPUDynInstPtr gpuDynInst, PacketPtr pkt)
         scalarDTLBPort.retries.push_back(pkt);
     } else {
         DPRINTF(GPUTLB, "sent scalar %s translation request for addr %#x\n",
-                tlb_mode == BaseTLB::Read ? "read" : "write",
+                tlb_mode == BaseMMU::Read ? "read" : "write",
                 pkt->req->getVaddr());
     }
 }
@@ -1221,7 +1231,7 @@ ComputeUnit::injectGlobalMemFence(GPUDynInstPtr gpuDynInst,
                                   RequestPtr req)
 {
     assert(gpuDynInst->isGlobalSeg() ||
-           gpuDynInst->executedAs() == Enums::SC_GLOBAL);
+           gpuDynInst->executedAs() == enums::SC_GLOBAL);
 
     if (!req) {
         req = std::make_shared<Request>(
@@ -1385,15 +1395,15 @@ ComputeUnit::DTLBPort::recvTimingResp(PacketPtr pkt)
     computeUnit->stats.tlbCycles += curTick();
 
     // pop off the TLB translation state
-    X86ISA::GpuTLB::TranslationState *translation_state =
-               safe_cast<X86ISA::GpuTLB::TranslationState*>(pkt->senderState);
+    GpuTranslationState *translation_state =
+               safe_cast<GpuTranslationState*>(pkt->senderState);
 
     // no PageFaults are permitted for data accesses
     if (!translation_state->tlbEntry) {
         DTLBPort::SenderState *sender_state =
             safe_cast<DTLBPort::SenderState*>(translation_state->saved);
 
-        M5_VAR_USED Wavefront *w =
+        [[maybe_unused]] Wavefront *w =
             computeUnit->wfList[sender_state->_gpuDynInst->simdId]
             [sender_state->_gpuDynInst->wfSlotId];
 
@@ -1410,7 +1420,7 @@ ComputeUnit::DTLBPort::recvTimingResp(PacketPtr pkt)
     pkt->senderState = translation_state->saved;
 
     // for prefetch pkt
-    BaseTLB::Mode TLB_mode = translation_state->tlbMode;
+    BaseMMU::Mode TLB_mode = translation_state->tlbMode;
 
     delete translation_state;
 
@@ -1443,13 +1453,13 @@ ComputeUnit::DTLBPort::recvTimingResp(PacketPtr pkt)
         Addr last = 0;
 
         switch(computeUnit->prefetchType) {
-        case Enums::PF_CU:
+        case enums::PF_CU:
             last = computeUnit->lastVaddrCU[mp_index];
             break;
-        case Enums::PF_PHASE:
+        case enums::PF_PHASE:
             last = computeUnit->lastVaddrSimd[simdId][mp_index];
             break;
-        case Enums::PF_WF:
+        case enums::PF_WF:
             last = computeUnit->lastVaddrWF[simdId][wfSlotId][mp_index];
         default:
             break;
@@ -1468,7 +1478,7 @@ ComputeUnit::DTLBPort::recvTimingResp(PacketPtr pkt)
         computeUnit->lastVaddrSimd[simdId][mp_index] = vaddr;
         computeUnit->lastVaddrWF[simdId][wfSlotId][mp_index] = vaddr;
 
-        stride = (computeUnit->prefetchType == Enums::PF_STRIDE) ?
+        stride = (computeUnit->prefetchType == enums::PF_STRIDE) ?
             computeUnit->prefetchStride: stride;
 
         DPRINTF(GPUPrefetch, "%#x to: CU[%d][%d][%d][%d]\n", vaddr,
@@ -1496,15 +1506,15 @@ ComputeUnit::DTLBPort::recvTimingResp(PacketPtr pkt)
 
             // Because it's atomic operation, only need TLB translation state
             prefetch_pkt->senderState =
-                new X86ISA::GpuTLB::TranslationState(TLB_mode,
+                new GpuTranslationState(TLB_mode,
                     computeUnit->shader->gpuTc, true);
 
             // Currently prefetches are zero-latency, hence the sendFunctional
             sendFunctional(prefetch_pkt);
 
             /* safe_cast the senderState */
-            X86ISA::GpuTLB::TranslationState *tlb_state =
-                 safe_cast<X86ISA::GpuTLB::TranslationState*>(
+            GpuTranslationState *tlb_state =
+                 safe_cast<GpuTranslationState*>(
                          prefetch_pkt->senderState);
 
 
@@ -1562,7 +1572,7 @@ ComputeUnit::DataPort::processMemReqEvent(PacketPtr pkt)
 {
     SenderState *sender_state = safe_cast<SenderState*>(pkt->senderState);
     GPUDynInstPtr gpuDynInst = sender_state->_gpuDynInst;
-    M5_VAR_USED ComputeUnit *compute_unit = computeUnit;
+    [[maybe_unused]] ComputeUnit *compute_unit = computeUnit;
 
     if (!(sendTimingReq(pkt))) {
         retries.push_back(std::make_pair(pkt, gpuDynInst));
@@ -1591,7 +1601,7 @@ ComputeUnit::ScalarDataPort::MemReqEvent::process()
 {
     SenderState *sender_state = safe_cast<SenderState*>(pkt->senderState);
     GPUDynInstPtr gpuDynInst = sender_state->_gpuDynInst;
-    M5_VAR_USED ComputeUnit *compute_unit = scalarDataPort.computeUnit;
+    [[maybe_unused]] ComputeUnit *compute_unit = scalarDataPort.computeUnit;
 
     if (!(scalarDataPort.sendTimingReq(pkt))) {
         scalarDataPort.retries.push_back(pkt);
@@ -1631,7 +1641,7 @@ ComputeUnit::DTLBPort::recvReqRetry()
 
     for (int i = 0; i < len; ++i) {
         PacketPtr pkt = retries.front();
-        M5_VAR_USED Addr vaddr = pkt->req->getVaddr();
+        [[maybe_unused]] Addr vaddr = pkt->req->getVaddr();
         DPRINTF(GPUTLB, "CU%d: retrying D-translaton for address%#x", vaddr);
 
         if (!sendTimingReq(pkt)) {
@@ -1651,8 +1661,8 @@ ComputeUnit::ScalarDTLBPort::recvTimingResp(PacketPtr pkt)
 {
     assert(pkt->senderState);
 
-    X86ISA::GpuTLB::TranslationState *translation_state =
-        safe_cast<X86ISA::GpuTLB::TranslationState*>(pkt->senderState);
+    GpuTranslationState *translation_state =
+        safe_cast<GpuTranslationState*>(pkt->senderState);
 
     // Page faults are not allowed
     fatal_if(!translation_state->tlbEntry,
@@ -1670,7 +1680,7 @@ ComputeUnit::ScalarDTLBPort::recvTimingResp(PacketPtr pkt)
     GPUDynInstPtr gpuDynInst = sender_state->_gpuDynInst;
     delete pkt->senderState;
 
-    M5_VAR_USED Wavefront *w = gpuDynInst->wavefront();
+    [[maybe_unused]] Wavefront *w = gpuDynInst->wavefront();
 
     DPRINTF(GPUTLB, "CU%d: WF[%d][%d][wv=%d]: scalar DTLB port received "
         "translation: PA %#x -> %#x\n", computeUnit->cu_id, w->simdId,
@@ -1709,15 +1719,15 @@ ComputeUnit::ScalarDTLBPort::recvTimingResp(PacketPtr pkt)
 bool
 ComputeUnit::ITLBPort::recvTimingResp(PacketPtr pkt)
 {
-    M5_VAR_USED Addr line = pkt->req->getPaddr();
+    [[maybe_unused]] Addr line = pkt->req->getPaddr();
     DPRINTF(GPUTLB, "CU%d: ITLBPort received %#x->%#x\n",
             computeUnit->cu_id, pkt->req->getVaddr(), line);
 
     assert(pkt->senderState);
 
     // pop off the TLB translation state
-    X86ISA::GpuTLB::TranslationState *translation_state
-        = safe_cast<X86ISA::GpuTLB::TranslationState*>(pkt->senderState);
+    GpuTranslationState *translation_state
+        = safe_cast<GpuTranslationState*>(pkt->senderState);
 
     bool success = translation_state->tlbEntry != nullptr;
     delete translation_state->tlbEntry;
@@ -1775,7 +1785,7 @@ ComputeUnit::ITLBPort::recvReqRetry()
 
     for (int i = 0; i < len; ++i) {
         PacketPtr pkt = retries.front();
-        M5_VAR_USED Addr vaddr = pkt->req->getVaddr();
+        [[maybe_unused]] Addr vaddr = pkt->req->getVaddr();
         DPRINTF(GPUTLB, "CU%d: retrying I-translaton for address%#x", vaddr);
 
         if (!sendTimingReq(pkt)) {
@@ -1817,6 +1827,8 @@ ComputeUnit::updateInstStats(GPUDynInstPtr gpuDynInst)
             } else {
                 stats.flatVMemInsts++;
             }
+        } else if (gpuDynInst->isFlatGlobal()) {
+            stats.flatVMemInsts++;
         } else if (gpuDynInst->isLocalMem()) {
             stats.ldsNoFlatInsts++;
         } else if (gpuDynInst->isLoad()) {
@@ -1827,28 +1839,28 @@ ComputeUnit::updateInstStats(GPUDynInstPtr gpuDynInst)
 
         if (gpuDynInst->isLoad()) {
             switch (gpuDynInst->executedAs()) {
-              case Enums::SC_SPILL:
+              case enums::SC_SPILL:
                 stats.spillReads++;
                 break;
-              case Enums::SC_GLOBAL:
+              case enums::SC_GLOBAL:
                 stats.globalReads++;
                 break;
-              case Enums::SC_GROUP:
+              case enums::SC_GROUP:
                 stats.groupReads++;
                 break;
-              case Enums::SC_PRIVATE:
+              case enums::SC_PRIVATE:
                 stats.privReads++;
                 break;
-              case Enums::SC_READONLY:
+              case enums::SC_READONLY:
                 stats.readonlyReads++;
                 break;
-              case Enums::SC_KERNARG:
+              case enums::SC_KERNARG:
                 stats.kernargReads++;
                 break;
-              case Enums::SC_ARG:
+              case enums::SC_ARG:
                 stats.argReads++;
                 break;
-              case Enums::SC_NONE:
+              case enums::SC_NONE:
                 /**
                  * this case can occur for flat mem insts
                  * who execute with EXEC = 0
@@ -1860,28 +1872,28 @@ ComputeUnit::updateInstStats(GPUDynInstPtr gpuDynInst)
             }
         } else if (gpuDynInst->isStore()) {
             switch (gpuDynInst->executedAs()) {
-              case Enums::SC_SPILL:
+              case enums::SC_SPILL:
                 stats.spillWrites++;
                 break;
-              case Enums::SC_GLOBAL:
+              case enums::SC_GLOBAL:
                 stats.globalWrites++;
                 break;
-              case Enums::SC_GROUP:
+              case enums::SC_GROUP:
                 stats.groupWrites++;
                 break;
-              case Enums::SC_PRIVATE:
+              case enums::SC_PRIVATE:
                 stats.privWrites++;
                 break;
-              case Enums::SC_READONLY:
+              case enums::SC_READONLY:
                 stats.readonlyWrites++;
                 break;
-              case Enums::SC_KERNARG:
+              case enums::SC_KERNARG:
                 stats.kernargWrites++;
                 break;
-              case Enums::SC_ARG:
+              case enums::SC_ARG:
                 stats.argWrites++;
                 break;
-              case Enums::SC_NONE:
+              case enums::SC_NONE:
                 /**
                  * this case can occur for flat mem insts
                  * who execute with EXEC = 0
@@ -2028,7 +2040,7 @@ ComputeUnit::LDSPort::sendTimingReq(PacketPtr pkt)
             dynamic_cast<ComputeUnit::LDSPort::SenderState*>(pkt->senderState);
     fatal_if(!sender_state, "packet without a valid sender state");
 
-    M5_VAR_USED GPUDynInstPtr gpuDynInst = sender_state->getMemInst();
+    [[maybe_unused]] GPUDynInstPtr gpuDynInst = sender_state->getMemInst();
 
     if (isStalled()) {
         fatal_if(retries.empty(), "must have retries waiting to be stalled");
@@ -2095,8 +2107,9 @@ ComputeUnit::LDSPort::recvReqRetry()
     }
 }
 
-ComputeUnit::ComputeUnitStats::ComputeUnitStats(Stats::Group *parent, int n_wf)
-    : Stats::Group(parent),
+ComputeUnit::ComputeUnitStats::ComputeUnitStats(statistics::Group *parent,
+    int n_wf)
+    : statistics::Group(parent),
       ADD_STAT(vALUInsts, "Number of vector ALU insts issued."),
       ADD_STAT(vALUInstsPerWF, "The avg. number of vector ALU insts issued "
                "per-wavefront."),
@@ -2281,7 +2294,8 @@ ComputeUnit::ComputeUnitStats::ComputeUnitStats(Stats::Group *parent, int n_wf)
     activeLanesPerGMemInstrDist.init(1, cu->wfSize(), 4);
     activeLanesPerLMemInstrDist.init(1, cu->wfSize(), 4);
 
-    headTailLatency.init(0, 1000000, 10000).flags(Stats::pdf | Stats::oneline);
+    headTailLatency.init(0, 1000000, 10000).flags(statistics::pdf |
+        statistics::oneline);
     waveLevelParallelism.init(0, n_wf * cu->numVectorALUs, 1);
     instInterleave.init(cu->numVectorALUs, 0, 20, 1);
 
@@ -2332,3 +2346,5 @@ ComputeUnit::ComputeUnitStats::ComputeUnitStats(Stats::Group *parent, int n_wf)
     numALUInstsExecuted = numInstrExecuted - dynamicGMemInstrCnt -
         dynamicLMemInstrCnt;
 }
+
+} // namespace gem5

@@ -41,7 +41,7 @@
 #include "arch/x86/faults.hh"
 
 #include "arch/x86/generated/decoder.hh"
-#include "arch/x86/isa_traits.hh"
+#include "arch/x86/insts/static_inst.hh"
 #include "arch/x86/mmu.hh"
 #include "base/loader/symtab.hh"
 #include "base/trace.hh"
@@ -49,6 +49,9 @@
 #include "debug/Faults.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
+
+namespace gem5
+{
 
 namespace X86ISA
 {
@@ -61,10 +64,9 @@ X86FaultBase::invoke(ThreadContext *tc, const StaticInstPtr &inst)
         return;
     }
 
-    PCState pcState = tc->pcState();
-    Addr pc = pcState.pc();
-    DPRINTF(Faults, "RIP %#x: vector %d: %s\n", pc, vector, describe());
-    using namespace X86ISAInst::RomLabels;
+    PCState pc = tc->pcState().as<PCState>();
+    DPRINTF(Faults, "RIP %#x: vector %d: %s\n", pc.pc(), vector, describe());
+    using namespace X86ISAInst::rom_labels;
     HandyM5Reg m5reg = tc->readMiscRegNoEffect(MISCREG_M5_REG);
     MicroPC entry;
     if (m5reg.mode == LongMode) {
@@ -74,7 +76,7 @@ X86FaultBase::invoke(ThreadContext *tc, const StaticInstPtr &inst)
         entry = extern_label_legacyModeInterrupt;
     }
     tc->setIntReg(INTREG_MICRO(1), vector);
-    tc->setIntReg(INTREG_MICRO(7), pc);
+    tc->setIntReg(INTREG_MICRO(7), pc.pc());
     if (errorCode != (uint64_t)(-1)) {
         if (m5reg.mode == LongMode) {
             entry = extern_label_longModeInterruptWithError;
@@ -87,9 +89,9 @@ X86FaultBase::invoke(ThreadContext *tc, const StaticInstPtr &inst)
         assert(!isSoft());
         tc->setIntReg(INTREG_MICRO(15), errorCode);
     }
-    pcState.upc(romMicroPC(entry));
-    pcState.nupc(romMicroPC(entry) + 1);
-    tc->pcState(pcState);
+    pc.upc(romMicroPC(entry));
+    pc.nupc(romMicroPC(entry) + 1);
+    tc->pcState(pc);
 }
 
 std::string
@@ -106,14 +108,9 @@ X86FaultBase::describe() const
 void
 X86Trap::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 {
-    X86FaultBase::invoke(tc);
-    if (!FullSystem)
-        return;
-
     // This is the same as a fault, but it happens -after- the
     // instruction.
-    PCState pc = tc->pcState();
-    pc.uEnd();
+    X86FaultBase::invoke(tc);
 }
 
 void
@@ -128,8 +125,9 @@ InvalidOpcode::invoke(ThreadContext *tc, const StaticInstPtr &inst)
     if (FullSystem) {
         X86Fault::invoke(tc, inst);
     } else {
+        auto *xsi = static_cast<X86StaticInst *>(inst.get());
         panic("Unrecognized/invalid instruction executed:\n %s",
-                inst->machInst);
+                xsi->machInst);
     }
 }
 
@@ -164,9 +162,9 @@ PageFault::invoke(ThreadContext *tc, const StaticInstPtr &inst)
             panic("Tried to %s unmapped address %#x.", modeStr, addr);
         } else {
             panic("Tried to %s unmapped address %#x.\nPC: %#x, Instr: %s",
-                  modeStr, addr, tc->pcState().pc(),
-                  inst->disassemble(tc->pcState().pc(),
-                      &Loader::debugSymbolTable));
+                  modeStr, addr, tc->pcState(),
+                  inst->disassemble(tc->pcState().instAddr(),
+                      &loader::debugSymbolTable));
         }
     }
 }
@@ -184,7 +182,7 @@ InitInterrupt::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 {
     DPRINTF(Faults, "Init interrupt.\n");
     // The otherwise unmodified integer registers should be set to 0.
-    for (int index = 0; index < NUM_INTREGS; index++) {
+    for (int index = 0; index < NUM_ARCH_INTREGS; index++) {
         tc->setIntReg(index, 0);
     }
 
@@ -291,7 +289,7 @@ InitInterrupt::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 
     // Update the handy M5 Reg.
     tc->setMiscReg(MISCREG_M5_REG, 0);
-    MicroPC entry = X86ISAInst::RomLabels::extern_label_initIntHalt;
+    MicroPC entry = X86ISAInst::rom_labels::extern_label_initIntHalt;
     pc.upc(romMicroPC(entry));
     pc.nupc(romMicroPC(entry) + 1);
     tc->pcState(pc);
@@ -317,3 +315,4 @@ StartupInterrupt::invoke(ThreadContext *tc, const StaticInstPtr &inst)
 }
 
 } // namespace X86ISA
+} // namespace gem5

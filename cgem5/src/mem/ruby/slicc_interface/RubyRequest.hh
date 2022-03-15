@@ -52,6 +52,12 @@
 #include "mem/ruby/protocol/RubyAccessMode.hh"
 #include "mem/ruby/protocol/RubyRequestType.hh"
 
+namespace gem5
+{
+
+namespace ruby
+{
+
 class RubyRequest : public Message
 {
   public:
@@ -169,5 +175,8 @@ operator<<(std::ostream& out, const RubyRequest& obj)
   out << std::flush;
   return out;
 }
+
+} // namespace ruby
+} // namespace gem5
 
 #endif  //__MEM_RUBY_SLICC_INTERFACE_RUBYREQUEST_HH__

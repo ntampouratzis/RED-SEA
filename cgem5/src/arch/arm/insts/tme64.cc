@@ -35,10 +35,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
- #include "arch/arm/insts/tme64.hh"
- #include "debug/ArmTme.hh"
+#include "arch/arm/insts/tme64.hh"
 
- #include <sstream>
+#include <sstream>
+
+#include "debug/ArmTme.hh"
+
+namespace gem5
+{
 
 using namespace ArmISA;
 
@@ -46,7 +50,7 @@ namespace ArmISAInst {
 
 std::string
 TmeImmOp64::generateDisassembly(
-    Addr pc, const Loader::SymbolTable *symtab) const
+    Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss, "", false);
@@ -56,7 +60,7 @@ TmeImmOp64::generateDisassembly(
 
 std::string
 TmeRegNone64::generateDisassembly(
-    Addr pc, const Loader::SymbolTable *symtab) const
+    Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss);
@@ -66,7 +70,7 @@ TmeRegNone64::generateDisassembly(
 
 std::string
 MicroTmeBasic64::generateDisassembly(
-    Addr pc, const Loader::SymbolTable *symtab) const
+    Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss);
@@ -249,4 +253,5 @@ Tcommit64::Tcommit64(ExtMachInst _machInst) :
     microOps[1]->setLastMicroop();
 }
 
-} // namespace
+} // namespace ArmISAInst
+} // namespace gem5

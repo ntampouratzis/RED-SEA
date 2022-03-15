@@ -40,6 +40,9 @@
 #include "dev/reg_bank.hh"
 #include "params/IdeController.hh"
 
+namespace gem5
+{
+
 class IdeDisk;
 
 /**
@@ -78,7 +81,8 @@ class IdeController : public PciDevice
                           udmaControl, raz1, udmaTiming, raz2});
         }
 
-        enum {
+        enum
+        {
             TimeRegWithDecodeEnabled = 0x8000
         };
 
@@ -183,4 +187,7 @@ class IdeController : public PciDevice
     void serialize(CheckpointOut &cp) const override;
     void unserialize(CheckpointIn &cp) override;
 };
+
+} // namespace gem5
+
 #endif // __DEV_STORAGE_IDE_CTRL_HH_

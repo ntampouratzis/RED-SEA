@@ -38,10 +38,13 @@
 #include "arch/arm/insts/misc64.hh"
 #include "arch/arm/isa.hh"
 
+namespace gem5
+{
+
 using namespace ArmISA;
 
 std::string
-ImmOp64::generateDisassembly(Addr pc, const Loader::SymbolTable *symtab) const
+ImmOp64::generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss, "", false);
@@ -51,7 +54,7 @@ ImmOp64::generateDisassembly(Addr pc, const Loader::SymbolTable *symtab) const
 
 std::string
 RegRegImmImmOp64::generateDisassembly(
-        Addr pc, const Loader::SymbolTable *symtab) const
+        Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss, "", false);
@@ -64,7 +67,7 @@ RegRegImmImmOp64::generateDisassembly(
 
 std::string
 RegRegRegImmOp64::generateDisassembly(
-    Addr pc, const Loader::SymbolTable *symtab) const
+    Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss, "", false);
@@ -79,7 +82,7 @@ RegRegRegImmOp64::generateDisassembly(
 
 std::string
 UnknownOp64::generateDisassembly(
-        Addr pc, const Loader::SymbolTable *symtab) const
+        Addr pc, const loader::SymbolTable *symtab) const
 {
     return csprintf("%-10s (inst %#08x)", "unknown", encoding());
 }
@@ -96,13 +99,13 @@ MiscRegOp64::trap(ThreadContext *tc, MiscRegIndex misc_reg,
     }
 
     // Check for traps to hypervisor
-    if ((ArmSystem::haveVirtualization(tc) && el <= EL2) &&
+    if ((ArmSystem::haveEL(tc, EL2) && el <= EL2) &&
         checkEL2Trap(tc, misc_reg, el, ec, immediate)) {
         return std::make_shared<HypervisorTrap>(machInst, immediate, ec);
     }
 
     // Check for traps to secure monitor
-    if ((ArmSystem::haveSecurity(tc) && el <= EL3) &&
+    if ((ArmSystem::haveEL(tc, EL3) && el <= EL3) &&
         checkEL3Trap(tc, misc_reg, el, ec, immediate)) {
         return std::make_shared<SecureMonitorTrap>(machInst, immediate, ec);
     }
@@ -416,7 +419,7 @@ MiscRegOp64::checkEL2Trap(ThreadContext *tc, const MiscRegIndex misc_reg,
         break;
        // Generic Timer
       case MISCREG_CNTFRQ_EL0 ... MISCREG_CNTVOFF_EL2:
-        trap_to_hyp = el <= EL1 &&
+        trap_to_hyp = EL2Enabled(tc) && el <= EL1 &&
                       isGenericTimerSystemAccessTrapEL2(misc_reg, tc);
         break;
       case MISCREG_DAIF:
@@ -797,18 +800,21 @@ MiscRegOp64::checkEL3Trap(ThreadContext *tc, const MiscRegIndex misc_reg,
 RegVal
 MiscRegImmOp64::miscRegImm() const
 {
-    if (dest == MISCREG_SPSEL) {
+    switch (dest) {
+      case MISCREG_SPSEL:
         return imm & 0x1;
-    } else if (dest == MISCREG_PAN) {
+      case MISCREG_PAN:
         return (imm & 0x1) << 22;
-    } else {
+      case MISCREG_UAO:
+        return (imm & 0x1) << 23;
+      default:
         panic("Not a valid PSTATE field register\n");
     }
 }
 
 std::string
 MiscRegImmOp64::generateDisassembly(
-        Addr pc, const Loader::SymbolTable *symtab) const
+        Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss);
@@ -820,7 +826,7 @@ MiscRegImmOp64::generateDisassembly(
 
 std::string
 MiscRegRegImmOp64::generateDisassembly(
-    Addr pc, const Loader::SymbolTable *symtab) const
+    Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss);
@@ -832,7 +838,7 @@ MiscRegRegImmOp64::generateDisassembly(
 
 std::string
 RegMiscRegImmOp64::generateDisassembly(
-    Addr pc, const Loader::SymbolTable *symtab) const
+    Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss);
@@ -867,17 +873,19 @@ MiscRegImplDefined64::execute(ExecContext *xc,
 
 std::string
 MiscRegImplDefined64::generateDisassembly(
-        Addr pc, const Loader::SymbolTable *symtab) const
+        Addr pc, const loader::SymbolTable *symtab) const
 {
     return csprintf("%-10s (implementation defined)", fullMnemonic.c_str());
 }
 
 std::string
 RegNone::generateDisassembly(
-    Addr pc, const Loader::SymbolTable *symtab) const
+    Addr pc, const loader::SymbolTable *symtab) const
 {
     std::stringstream ss;
     printMnemonic(ss);
     printIntReg(ss, dest);
     return ss.str();
 }
+
+} // namespace gem5

@@ -40,17 +40,21 @@
 
 #include <sys/syscall.h>
 
-#include "arch/x86/isa_traits.hh"
 #include "arch/x86/linux/linux.hh"
+#include "arch/x86/page_size.hh"
 #include "arch/x86/process.hh"
-#include "arch/x86/registers.hh"
+#include "arch/x86/regs/int.hh"
 #include "arch/x86/se_workload.hh"
 #include "base/trace.hh"
 #include "cpu/thread_context.hh"
 #include "kern/linux/linux.hh"
+#include "mem/se_translating_port_proxy.hh"
 #include "sim/process.hh"
 #include "sim/syscall_desc.hh"
 #include "sim/syscall_emul.hh"
+
+namespace gem5
+{
 
 namespace
 {
@@ -59,37 +63,37 @@ class LinuxLoader : public Process::Loader
 {
   public:
     Process *
-    load(const ProcessParams &params, ::Loader::ObjectFile *obj_file)
+    load(const ProcessParams &params, loader::ObjectFile *obj_file)
     {
         auto arch = obj_file->getArch();
         auto opsys = obj_file->getOpSys();
 
-        if (arch != ::Loader::X86_64 && arch != ::Loader::I386)
+        if (arch != loader::X86_64 && arch != loader::I386)
             return nullptr;
 
-        if (opsys == ::Loader::UnknownOpSys) {
+        if (opsys == loader::UnknownOpSys) {
             warn("Unknown operating system; assuming Linux.");
-            opsys = ::Loader::Linux;
+            opsys = loader::Linux;
         }
 
-        if (opsys != ::Loader::Linux)
+        if (opsys != loader::Linux)
             return nullptr;
 
-        if (arch == ::Loader::X86_64)
+        if (arch == loader::X86_64)
             return new X86ISA::X86_64Process(params, obj_file);
         else
             return new X86ISA::I386Process(params, obj_file);
     }
 };
 
-LinuxLoader loader;
+LinuxLoader linuxLoader;
 
 } // anonymous namespace
 
 namespace X86ISA
 {
 
-EmuLinux::EmuLinux(const Params &p) : SEWorkload(p)
+EmuLinux::EmuLinux(const Params &p) : SEWorkload(p, PageShift)
 {}
 
 const std::vector<IntRegIndex> EmuLinux::SyscallABI64::ArgumentRegs = {
@@ -112,11 +116,11 @@ EmuLinux::syscall(ThreadContext *tc)
     if (dynamic_cast<X86_64Process *>(process)) {
         syscallDescs64.get(rax)->doSyscall(tc);
     } else if (auto *proc32 = dynamic_cast<I386Process *>(process)) {
-        PCState pc = tc->pcState();
+        PCState pc = tc->pcState().as<PCState>();
         Addr eip = pc.pc();
         const auto &vsyscall = proc32->getVSyscallPage();
         if (eip >= vsyscall.base && eip < vsyscall.base + vsyscall.size) {
-            pc.npc(vsyscall.base + vsyscall.vsysexitOffset);
+            pc.set(vsyscall.base + vsyscall.vsysexitOffset);
             tc->pcState(pc);
         }
         syscallDescs32.get(rax)->doSyscall(tc);
@@ -129,10 +133,10 @@ void
 EmuLinux::event(ThreadContext *tc)
 {
     Process *process = tc->getProcessPtr();
-    auto pcState = tc->pcState();
+    Addr pc = tc->pcState().instAddr();
 
     if (process->kvmInSE) {
-        Addr pc_page = mbits(pcState.pc(), 63, 12);
+        Addr pc_page = mbits(pc, 63, 12);
         if (pc_page == syscallCodeVirtAddr) {
             syscall(tc);
             return;
@@ -141,7 +145,7 @@ EmuLinux::event(ThreadContext *tc)
             return;
         }
     }
-    warn("Unexpected workload event at pc %#x.", pcState.pc());
+    warn("Unexpected workload event at pc %#x.", pc);
 }
 
 void
@@ -149,7 +153,7 @@ EmuLinux::pageFault(ThreadContext *tc)
 {
     Process *p = tc->getProcessPtr();
     if (!p->fixupFault(tc->readMiscReg(MISCREG_CR2))) {
-        PortProxy &proxy = tc->getVirtProxy();
+        SETranslatingPortProxy proxy(tc);
         // at this point we should have 6 values on the interrupt stack
         int size = 6;
         uint64_t is[size];
@@ -169,3 +173,4 @@ EmuLinux::pageFault(ThreadContext *tc)
 }
 
 } // namespace X86ISA
+} // namespace gem5

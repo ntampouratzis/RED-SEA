@@ -32,7 +32,11 @@
 #include "params/FastModelPL330.hh"
 #include "sim/core.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 PL330::PL330(const FastModelPL330Params &params,
@@ -219,7 +223,7 @@ PL330::allocateIrq(int idx, int count)
     }
 }
 
-::Port &
+gem5::Port &
 PL330::gem5_getPort(const std::string &if_name, int idx)
 {
     if (if_name == "dma") {
@@ -255,7 +259,8 @@ void
 PL330::start_of_simulation()
 {
     // Set the clock rate using the divider inside the EVS.
-    clockRateControl->set_mul_div(SimClock::Int::s, clockPeriod);
+    clockRateControl->set_mul_div(sim_clock::as_int::s, clockPeriod);
 }
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5

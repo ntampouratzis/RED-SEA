@@ -2,8 +2,8 @@
 # All rights reserved.
 #
 # ----------------------------------------------------------------------------
-# Copyright (c) 2021, H2020 COSSIM.
-# Copyright (c) 2021, Exascale Performance Systems (EXAPSYS)
+# Copyright (c) 2022, H2020 COSSIM.
+# Copyright (c) 2022, Exascale Performance Systems (EXAPSYS)
 # ----------------------------------------------------------------------------
 #
 # The license below extends only to copyright in the software and shall
@@ -47,22 +47,24 @@ from m5.params import *
 from m5.proxy import *
 from m5.objects.PciDevice import PciDevice, PciIoBar, PciMemBar
 
-import os
+import os #COSSIM
 
 ETHERNET_ROLE = 'ETHERNET'
 Port.compat(ETHERNET_ROLE, ETHERNET_ROLE)
 
 class EtherInt(Port):
     def __init__(self, desc):
-        super(EtherInt, self).__init__(ETHERNET_ROLE, desc)
+        super().__init__(ETHERNET_ROLE, desc)
 
 class VectorEtherInt(VectorPort):
     def __init__(self, desc):
-        super(VectorEtherInt, self).__init__(ETHERNET_ROLE, desc)
+        super().__init__(ETHERNET_ROLE, desc)
 
 class EtherLink(SimObject):
     type = 'EtherLink'
     cxx_header = "dev/net/etherlink.hh"
+    cxx_class = 'gem5::EtherLink'
+
     int0 = EtherInt("interface 0")
     int1 = EtherInt("interface 1")
     delay = Param.Latency('0us', "packet transmit delay")
@@ -73,6 +75,8 @@ class EtherLink(SimObject):
 class DistEtherLink(SimObject):
     type = 'DistEtherLink'
     cxx_header = "dev/net/dist_etherlink.hh"
+    cxx_class = 'gem5::DistEtherLink'
+
     int0 = EtherInt("interface 0")
     delay = Param.Latency('0us', "packet transmit delay")
     delay_var = Param.Latency('0ns', "packet transmit delay variability")
@@ -88,26 +92,28 @@ class DistEtherLink(SimObject):
     dist_sync_on_pseudo_op = Param.Bool(False, "Start sync with pseudo_op")
     num_nodes = Param.UInt32('2', "Number of simulate nodes")
 
-if 'CERTI_SOURCE_DIRECTORY' in os.environ and 'CERTI_BINARY_DIRECTORY' in os.environ:
-    class COSSIMEtherLink(SimObject):
-        type = 'COSSIMEtherLink'
-        cxx_header = "dev/net/COSSIMetherlink.hh"
-        interface = EtherInt("interface")
-        delay = Param.Latency('0us', "packet transmit delay")
-        delay_var = Param.Latency('0ns', "packet transmit delay variability")
-        speed = Param.NetworkBandwidth('1Gbps', "link speed")
-        dump = Param.EtherDump(NULL, "dump object")
-        nodeNum = Param.Int("Node Number")
-        TotalNodes = Param.Int("Total Nodes")
-        ticksPerNanoSecond =  Param.ConvertFromNanoSecToTicks('ticksPerNanoSecond', "ticksPerNanoSecond")
-        sys_clk = Param.String("System Clock")
-        SynchTime = Param.String("Synchronization Time")
-        RxPacketTime = Param.String("Minimum time in which the node can receive packet from OMNET++")
 
+class COSSIMEtherLink(SimObject):
+    type = 'COSSIMEtherLink'
+    cxx_header = "dev/net/COSSIMetherlink.hh"
+    cxx_class = 'gem5::COSSIMEtherLink'
+    interface = EtherInt("interface")
+    delay = Param.Latency('0us', "packet transmit delay")
+    delay_var = Param.Latency('0ns', "packet transmit delay variability")
+    speed = Param.NetworkBandwidth('1Gbps', "link speed")
+    dump = Param.EtherDump(NULL, "dump object")
+    nodeNum = Param.Int("Node Number")
+    TotalNodes = Param.Int("Total Nodes")
+    ticksPerNanoSecond =  Param.ConvertFromNanoSecToTicks('ticksPerNanoSecond', "ticksPerNanoSecond")
+    sys_clk = Param.String("System Clock")
+    SynchTime = Param.String("Synchronization Time")
+    RxPacketTime = Param.String("Minimum time in which the node can receive packet from OMNET++")
 
 class EtherBus(SimObject):
     type = 'EtherBus'
     cxx_header = "dev/net/etherbus.hh"
+    cxx_class = 'gem5::EtherBus'
+
     loopback = Param.Bool(True, "send packet back to the sending interface")
     dump = Param.EtherDump(NULL, "dump object")
     speed = Param.NetworkBandwidth('100Mbps', "bus speed in bits per second")
@@ -115,6 +121,8 @@ class EtherBus(SimObject):
 class EtherSwitch(SimObject):
     type = 'EtherSwitch'
     cxx_header = "dev/net/etherswitch.hh"
+    cxx_class = 'gem5::EtherSwitch'
+
     dump = Param.EtherDump(NULL, "dump object")
     fabric_speed = Param.NetworkBandwidth('10Gbps', "switch fabric speed in "
                                           "bits per second")
@@ -129,14 +137,18 @@ class EtherTapBase(SimObject):
     type = 'EtherTapBase'
     abstract = True
     cxx_header = "dev/net/ethertap.hh"
+    cxx_class = 'gem5::EtherTapBase'
+
     bufsz = Param.Int(10000, "tap buffer size")
     dump = Param.EtherDump(NULL, "dump object")
     tap = EtherInt("Ethernet interface to connect to gem5's network")
 
-if buildEnv['USE_TUNTAP']:
+if buildEnv['HAVE_TUNTAP']:
     class EtherTap(EtherTapBase):
         type = 'EtherTap'
         cxx_header = "dev/net/ethertap.hh"
+        cxx_class = 'gem5::EtherTap'
+
         tun_clone_device = Param.String('/dev/net/tun',
                                         "Path to the tun clone device node")
         tap_device_name = Param.String('gem5-tap', "Tap device name")
@@ -144,11 +156,15 @@ if buildEnv['USE_TUNTAP']:
 class EtherTapStub(EtherTapBase):
     type = 'EtherTapStub'
     cxx_header = "dev/net/ethertap.hh"
+    cxx_class = 'gem5::EtherTapStub'
+
     port = Param.UInt16(3500, "Port helper should send packets to")
 
 class EtherDump(SimObject):
     type = 'EtherDump'
     cxx_header = "dev/net/etherdump.hh"
+    cxx_class = 'gem5::EtherDump'
+
     file = Param.String("dump file")
     maxlen = Param.Int(96, "max portion of packet data to dump")
 
@@ -156,12 +172,16 @@ class EtherDevice(PciDevice):
     type = 'EtherDevice'
     abstract = True
     cxx_header = "dev/net/etherdevice.hh"
+    cxx_class = 'gem5::EtherDevice'
+
     interface = EtherInt("Ethernet Interface")
 
 class IGbE(EtherDevice):
     # Base class for two IGbE adapters listed above
     type = 'IGbE'
     cxx_header = "dev/net/i8254xGBe.hh"
+    cxx_class = 'gem5::IGbE'
+
     hardware_address = Param.EthernetAddr(NextEthernetAddr,
         "Ethernet Hardware Address")
     rx_fifo_size = Param.MemorySize('384KiB', "Size of the rx FIFO")
@@ -209,6 +229,7 @@ class EtherDevBase(EtherDevice):
     type = 'EtherDevBase'
     abstract = True
     cxx_header = "dev/net/etherdevice.hh"
+    cxx_class = 'gem5::EtherDevBase'
 
     hardware_address = Param.EthernetAddr(NextEthernetAddr,
         "Ethernet Hardware Address")
@@ -232,6 +253,7 @@ class EtherDevBase(EtherDevice):
 class NSGigE(EtherDevBase):
     type = 'NSGigE'
     cxx_header = "dev/net/ns_gige.hh"
+    cxx_class = 'gem5::NSGigE'
 
     dma_data_free = Param.Bool(False, "DMA of Data is free")
     dma_desc_free = Param.Bool(False, "DMA of Descriptors is free")
@@ -253,7 +275,7 @@ class NSGigE(EtherDevBase):
 
 class Sinic(EtherDevBase):
     type = 'Sinic'
-    cxx_class = 'Sinic::Device'
+    cxx_class = 'gem5::sinic::Device'
     cxx_header = "dev/net/sinic.hh"
 
     rx_max_copy = Param.MemorySize('1514B', "rx max copy")

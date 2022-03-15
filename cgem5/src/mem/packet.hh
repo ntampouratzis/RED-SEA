@@ -49,6 +49,7 @@
 
 #include <bitset>
 #include <cassert>
+#include <initializer_list>
 #include <list>
 
 #include "base/addr_range.hh"
@@ -61,7 +62,9 @@
 #include "mem/htm.hh"
 #include "mem/request.hh"
 #include "sim/byteswap.hh"
-#include "sim/core.hh"
+
+namespace gem5
+{
 
 class Packet;
 typedef Packet *PacketPtr;
@@ -167,6 +170,15 @@ class MemCmd
         NUM_COMMAND_ATTRIBUTES
     };
 
+    static constexpr unsigned long long
+    buildAttributes(std::initializer_list<Attribute> attrs)
+    {
+        unsigned long long ret = 0;
+        for (const auto &attr: attrs)
+            ret |= (1ULL << attr);
+        return ret;
+    }
+
     /**
      * Structure that defines attributes and other data associated
      * with a Command.
@@ -180,6 +192,11 @@ class MemCmd
         const Command response;
         /// String representation (for printing)
         const std::string str;
+
+        CommandInfo(std::initializer_list<Attribute> attrs,
+                Command _response, const std::string &_str) :
+            attributes(buildAttributes(attrs)), response(_response), str(_str)
+        {}
     };
 
     /// Array to map Command enum to associated info.
@@ -230,6 +247,14 @@ class MemCmd
     bool isPrint() const        { return testCmdAttrib(IsPrint); }
     bool isFlush() const        { return testCmdAttrib(IsFlush); }
 
+    bool
+    isDemand() const
+    {
+        return (cmd == ReadReq || cmd == WriteReq ||
+                cmd == WriteLineReq || cmd == ReadExReq ||
+                cmd == ReadCleanReq || cmd == ReadSharedReq);
+    }
+
     Command
     responseCommand() const
     {
@@ -259,11 +284,11 @@ class Packet : public Printable
 {
   public:
     typedef uint32_t FlagsType;
-    typedef ::Flags<FlagsType> Flags;
+    typedef gem5::Flags<FlagsType> Flags;
 
   private:
-
-    enum : FlagsType {
+    enum : FlagsType
+    {
         // Flags to transfer across when copying a packet
         COPY_FLAGS             = 0x000000FF,
 
@@ -556,6 +581,7 @@ class Packet : public Printable
 
     bool isRead() const              { return cmd.isRead(); }
     bool isWrite() const             { return cmd.isWrite(); }
+    bool isDemand() const            { return cmd.isDemand(); }
     bool isUpgrade()  const          { return cmd.isUpgrade(); }
     bool isRequest() const           { return cmd.isRequest(); }
     bool isResponse() const          { return cmd.isResponse(); }
@@ -1260,7 +1286,7 @@ class Packet : public Printable
             assert(req->getByteEnable().size() == getSize());
             // Write only the enabled bytes
             const uint8_t *base = getConstPtr<uint8_t>();
-            for (int i = 0; i < getSize(); i++) {
+            for (unsigned int i = 0; i < getSize(); i++) {
                 if (req->getByteEnable()[i]) {
                     p[i] = *(base + i);
                 }
@@ -1470,5 +1496,7 @@ class Packet : public Printable
      */
     HtmCacheFailure getHtmTransactionFailedInCacheRC() const;
 };
+
+} // namespace gem5
 
 #endif //__MEM_PACKET_HH

@@ -52,11 +52,12 @@ class SMTQueuePolicy(ScopedEnum):
     vals = [ 'Dynamic', 'Partitioned', 'Threshold' ]
 
 class CommitPolicy(ScopedEnum):
-    vals = [ 'Aggressive', 'RoundRobin', 'OldestReady' ]
+    vals = [ 'RoundRobin', 'OldestReady' ]
 
-class DerivO3CPU(BaseCPU):
-    type = 'DerivO3CPU'
-    cxx_header = 'cpu/o3/deriv.hh'
+class O3CPU(BaseCPU):
+    type = 'O3CPU'
+    cxx_class = 'gem5::o3::CPU'
+    cxx_header = 'cpu/o3/dyn_inst.hh'
 
     @classmethod
     def memory_mode(cls):
@@ -177,7 +178,7 @@ class DerivO3CPU(BaseCPU):
 
     def addCheckerCpu(self):
         if buildEnv['TARGET_ISA'] in ['arm']:
-            from m5.objects.ArmTLB import ArmMMU
+            from m5.objects.ArmMMU import ArmMMU
 
             self.checker = O3Checker(workload=self.workload,
                                      exitOnError=False,
@@ -191,3 +192,6 @@ class DerivO3CPU(BaseCPU):
         else:
             print("ERROR: Checker only supported under ARM ISA!")
             exit(1)
+
+# Deprecated
+DerivO3CPU = O3CPU

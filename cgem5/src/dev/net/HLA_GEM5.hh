@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------------------
 // COSSIM - GEM5 HLA RunTime Infrastructure
-// Copyright (c) 2021, H2020 COSSIM.
-// Copyright (c) 2021, Exascale Performance Systems (EXAPSYS)
+// Copyright (c) 2022, H2020 COSSIM.
+// Copyright (c) 2022, Exascale Performance Systems (EXAPSYS)
 // Author: Tampouratzis Nikolaos, tampouratzis@exapsys.eu
 // ----------------------------------------------------------------------------
 
@@ -44,6 +44,8 @@
 #define READ_GLOBAL 4
 #define CLOSE_SERVER 5
 
+namespace gem5{
+
 typedef struct HLAInitializationRequests{
  int type;
  char name[30];
@@ -56,7 +58,7 @@ class HLA_GEM5 : public NullFederateAmbassador
 public:
 
     HLA_GEM5(std::string, int, int);
-    virtual ~HLA_GEM5() throw (RTI::FederateInternalError);
+    virtual ~HLA_GEM5() ;
 
     void join(std::string, std::string);
     void pause();
@@ -88,47 +90,34 @@ public:
     RTI::FederateHandle getHandle() const ;
 
     // Callbacks
-    void announceSynchronizationPoint(const char *label, const char *tag)
-        throw (RTI::FederateInternalError);
+    void announceSynchronizationPoint(const char *label, const char *tag);
 
-    void federationSynchronized(const char *label)
-        throw (RTI::FederateInternalError);
+    void federationSynchronized(const char *label);
 
-    void timeAdvanceGrant(const RTI::FedTime& theTime)
-        throw (RTI::FederateInternalError, RTI::TimeAdvanceWasNotInProgress, 
-	       RTI::InvalidFederationTime);
+    void timeAdvanceGrant(const RTI::FedTime& theTime);
 
     void discoverObjectInstance(RTI::ObjectHandle theObject,
                                 RTI::ObjectClassHandle theObjectClass,
-                                const char *theObjectName)
-        throw (RTI::FederateInternalError, RTI::ObjectClassNotKnown, RTI::CouldNotDiscover);
+                                const char *theObjectName);
 	
 	
-    void reflectAttributeValues(RTI::ObjectHandle, const RTI::AttributeHandleValuePairSet &, const char *) 
-	throw (RTI::ObjectNotKnown, RTI::AttributeNotKnown, RTI::FederateOwnsAttributes,
-	       RTI::FederateInternalError);
+    void reflectAttributeValues(RTI::ObjectHandle, const RTI::AttributeHandleValuePairSet &, const char *) ;
 
 
     void receiveInteraction(RTI::InteractionClassHandle theInteraction,
                             const RTI::ParameterHandleValuePairSet& theParameters,
                             const RTI::FedTime& theTime, const char *theTag,
-                            RTI::EventRetractionHandle theHandle)
-        throw (RTI::InteractionClassNotKnown, RTI::InteractionParameterNotKnown,
-               RTI::InvalidFederationTime, RTI::FederateInternalError);
+                            RTI::EventRetractionHandle theHandle);
 
     void receiveInteraction(RTI::InteractionClassHandle,
                             const RTI::ParameterHandleValuePairSet &,
-                            const char *)
-        throw (RTI::InteractionClassNotKnown, RTI::InteractionParameterNotKnown,
-	       RTI::FederateInternalError) { };
+                            const char *) { };
 
     void removeObjectInstance(RTI::ObjectHandle theObject, const RTI::FedTime& theTime,
 			      const char *theTag,
-			      RTI::EventRetractionHandle theHandle)
-	throw (RTI::ObjectNotKnown, RTI::InvalidFederationTime, RTI::FederateInternalError);
+			      RTI::EventRetractionHandle theHandle);
 
-    void removeObjectInstance(RTI::ObjectHandle, const char *)
-	throw (RTI::ObjectNotKnown, RTI::FederateInternalError) { };
+    void removeObjectInstance(RTI::ObjectHandle, const char *) { };
 
     
     void sendInteraction(uint8_t* , uint32_t);
@@ -179,3 +168,4 @@ protected:
 
 #endif // CERTI_HLA_GEM5_HH
 
+}

@@ -31,7 +31,11 @@
 #include "params/FastModelGIC.hh"
 #include "params/SCFastModelGIC.hh"
 
-namespace FastModel
+namespace gem5
+{
+
+GEM5_DEPRECATED_NAMESPACE(FastModel, fastmodel);
+namespace fastmodel
 {
 
 int
@@ -69,7 +73,7 @@ SCGIC::Terminator::sendTowardsCPU(uint8_t len, const uint8_t *data)
 
 SCGIC::SCGIC(const SCFastModelGICParams &params,
              sc_core::sc_module_name _name)
-    : scx_evs_GIC(_name)
+    : scx_evs_GIC(_name), _params(params)
 {
     signalInterrupt.bind(signal_interrupt);
 
@@ -357,4 +361,5 @@ GIC::supportsVersion(GicVersion version)
            (version == GicVersion::GIC_V4 && scGIC->params().has_gicv4_1);
 }
 
-} // namespace FastModel
+} // namespace fastmodel
+} // namespace gem5

@@ -48,7 +48,6 @@
 #include "base/types.hh"
 #include "dev/arm/base_gic.hh"
 #include "dev/arm/generic_timer_miscregs_types.hh"
-#include "sim/core.hh"
 #include "sim/drain.hh"
 #include "sim/eventq.hh"
 #include "sim/serialize.hh"
@@ -62,6 +61,9 @@
 ///     D11.2 - The AArch64 view of the Generic Timer
 ///     G6.2  - The AArch32 view of the Generic Timer
 ///     I2 - System Level Implementation of the Generic Timer
+
+namespace gem5
+{
 
 class Checkpoint;
 struct SystemCounterParams;
@@ -584,5 +586,7 @@ class GenericTimerMem : public PioDevice
 
     ArmSystem &system;
 };
+
+} // namespace gem5
 
 #endif // __DEV_ARM_GENERIC_TIMER_HH__

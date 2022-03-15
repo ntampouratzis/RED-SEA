@@ -2,8 +2,6 @@
  * Copyright (c) 2014-2017 Advanced Micro Devices, Inc.
  * All rights reserved.
  *
- * For use for simulation and test purposes only
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -46,6 +44,9 @@
 #include "config/the_gpu_isa.hh"
 #include "gpu-compute/scheduler.hh"
 #include "mem/packet.hh"
+
+namespace gem5
+{
 
 class ComputeUnit;
 class Wavefront;
@@ -268,5 +269,7 @@ class FetchUnit
      */
     int fetchDepth;
 };
+
+} // namespace gem5
 
 #endif // __FETCH_UNIT_HH__

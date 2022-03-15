@@ -40,13 +40,18 @@
 
 #include "dev/arm/gic_v2.hh"
 
+#include "base/compiler.hh"
 #include "base/trace.hh"
+#include "cpu/base.hh"
 #include "debug/Checkpoint.hh"
 #include "debug/GIC.hh"
 #include "debug/IPI.hh"
 #include "debug/Interrupt.hh"
 #include "mem/packet.hh"
 #include "mem/packet_access.hh"
+
+namespace gem5
+{
 
 const AddrRange GicV2::GICD_IGROUPR   (0x080, 0x100);
 const AddrRange GicV2::GICD_ISENABLER (0x100, 0x180);
@@ -71,7 +76,7 @@ GicV2::GicV2(const Params &p)
       cpuPioDelay(p.cpu_pio_delay), intLatency(p.int_latency),
       enabled(false), haveGem5Extensions(p.gem5_extensions),
       itLines(p.it_lines),
-      intEnabled {}, pendingInt {}, activeInt {},
+      intEnabled {}, pendingInt {}, activeInt {}, intGroup {},
       intPriority {}, intConfig {}, cpuTarget {},
       cpuSgiPending {}, cpuSgiActive {},
       cpuSgiPendingExt {}, cpuSgiActiveExt {},
@@ -331,11 +336,11 @@ GicV2::readCpu(ContextID ctx, Addr daddr)
                             break;
                         }
                     }
-                    uint64_t sgi_num = ULL(1) << (ctx + 8 * iar.cpu_id);
+                    uint64_t sgi_num = 1ULL << (ctx + 8 * iar.cpu_id);
                     cpuSgiActive[iar.ack_id] |= sgi_num;
                     cpuSgiPending[iar.ack_id] &= ~sgi_num;
                 } else {
-                    uint64_t sgi_num = ULL(1) << iar.ack_id;
+                    uint64_t sgi_num = 1ULL << iar.ack_id;
                     cpuSgiActiveExt[ctx] |= sgi_num;
                     cpuSgiPendingExt[ctx] &= ~sgi_num;
                 }
@@ -389,7 +394,7 @@ GicV2::writeDistributor(PacketPtr pkt)
     const ContextID ctx = pkt->req->contextId();
     const size_t data_sz = pkt->getSize();
 
-    M5_VAR_USED uint32_t pkt_data;
+    [[maybe_unused]] uint32_t pkt_data;
     switch (data_sz)
     {
       case 1:
@@ -590,7 +595,7 @@ GicV2::writeCpu(ContextID ctx, Addr daddr, uint32_t data)
         const IAR iar = data;
         if (iar.ack_id < SGI_MAX) {
             // Clear out the bit that corresponds to the cleared int
-            uint64_t clr_int = ULL(1) << (ctx + 8 * iar.cpu_id);
+            uint64_t clr_int = 1ULL << (ctx + 8 * iar.cpu_id);
             if (!(cpuSgiActive[iar.ack_id] & clr_int) &&
                 !(cpuSgiActiveExt[ctx] & (1 << iar.ack_id)))
                 panic("Done handling a SGI that isn't active?\n");
@@ -716,7 +721,7 @@ uint64_t
 GicV2::genSwiMask(int cpu)
 {
     panic_if(cpu > sys->threads.size(), "Invalid CPU ID.");
-    return ULL(0x0101010101010101) << cpu;
+    return 0x0101010101010101ULL << cpu;
 }
 
 uint8_t
@@ -917,10 +922,11 @@ GicV2::clearPPInt(uint32_t num, uint32_t cpu)
 void
 GicV2::clearInt(ContextID ctx, uint32_t int_num)
 {
+    auto tc = sys->threads[ctx];
     if (isFiq(ctx, int_num)) {
-        platform->intrctrl->clear(ctx, ArmISA::INT_FIQ, 0);
+        tc->getCpuPtr()->clearInterrupt(tc->threadId(), ArmISA::INT_FIQ, 0);
     } else {
-        platform->intrctrl->clear(ctx, ArmISA::INT_IRQ, 0);
+        tc->getCpuPtr()->clearInterrupt(tc->threadId(), ArmISA::INT_IRQ, 0);
     }
 }
 
@@ -936,7 +942,8 @@ GicV2::postInt(uint32_t cpu, Tick when)
 void
 GicV2::postDelayedInt(uint32_t cpu)
 {
-    platform->intrctrl->post(cpu, ArmISA::INT_IRQ, 0);
+    auto tc = sys->threads[cpu];
+    tc->getCpuPtr()->postInterrupt(tc->threadId(), ArmISA::INT_IRQ, 0);
     --pendingDelayedInterrupts;
     assert(pendingDelayedInterrupts >= 0);
     if (pendingDelayedInterrupts == 0)
@@ -961,7 +968,8 @@ GicV2::supportsVersion(GicVersion version)
 void
 GicV2::postDelayedFiq(uint32_t cpu)
 {
-    platform->intrctrl->post(cpu, ArmISA::INT_FIQ, 0);
+    auto tc = sys->threads[cpu];
+    tc->getCpuPtr()->postInterrupt(tc->threadId(), ArmISA::INT_FIQ, 0);
     --pendingDelayedInterrupts;
     assert(pendingDelayedInterrupts >= 0);
     if (pendingDelayedInterrupts == 0)
@@ -1090,3 +1098,5 @@ GicV2::BankedRegs::unserialize(CheckpointIn &cp)
     UNSERIALIZE_ARRAY(intConfig, 2);
     UNSERIALIZE_ARRAY(intPriority, SGI_MAX + PPI_MAX);
 }
+
+} // namespace gem5

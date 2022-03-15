@@ -27,15 +27,80 @@ sudo apt install openjdk-8-jdk openjdk-8-jre tcl-dev tk-dev qt4-qmake libqt4-dev
 
 
 #Manual Installation
-``cd $HOME
+cd $HOME
 https://github.com/ntampouratzis/RED-SEA.git
-mv -f $HOME/RED-SEA $HOME/COSSIM``
+mv -f $HOME/RED-SEA $HOME/COSSIM
 
 ##cCERTI & Our SynchServer Installation
-``cd $HOME/COSSIM/cCERTI
+cd $HOME/COSSIM/cCERTI
 mkdir build_certi
 cd build_certi
-cmake -DCMAKE_INSTALL_PREFIX=$HOME/COSSIM/cCERTI/build_certi $HOME/COSSIM/cCERTI``
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/COSSIM/cCERTI/build_certi $HOME/COSSIM/cCERTI
+
+make
+make install
+
+cd $HOME/COSSIM/cCERTI/SynchServer
+./build.sh
+
+cd $HOME/COSSIM/cCERTI
+cp Federation.fed $HOME/COSSIM/cCERTI/build_certi/share/federations 
+
+echo "#cCERTI exports" >> ~/.bashrc
+echo "export CERTI_HOME=$HOME/COSSIM/cCERTI/build_certi" >> ~/.bashrc
+echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/COSSIM/cCERTI/build_certi/lib" >> ~/.bashrc
+echo "export PATH=$HOME/COSSIM/cCERTI/build_certi:$PATH" >> ~/.bashrc
+echo "export PATH=$HOME/COSSIM/cCERTI/build_certi/bin:$PATH" >> ~/.bashrc
+echo "export CERTI_SOURCE_DIRECTORY=$HOME/COSSIM/cCERTI" >> ~/.bashrc
+echo "export CERTI_BINARY_DIRECTORY=$HOME/COSSIM/cCERTI/build_certi" >> ~/.bashrc
+echo "#change CERTI_HOST if you want to use HLA Server (rtig) and SynchServer from another machine" >> ~/.bashrc
+echo "export CERTI_HOST=127.0.0.1" >> ~/.bashrc
+
+##cgem5 Installation
+cd $HOME/COSSIM/cgem5
+source ~/.bashrc
+scons build/ARM/gem5.fast -j4
+
+##Download GEM5 images and kernels from here: http://kition.mhl.tuc.gr:8000/f/ee638f25d1/ 
+##Untar kernels and images in $HOME/COSSIM directory
+cd $HOME/COSSIM
+tar -xf kernels.tar.xz
+
+echo "#GEM5 exports" >> ~/.bashrc
+echo "export GEM5=$HOME/COSSIM/cgem5" >> ~/.bashrc
+echo "export M5_PATH=$HOME/COSSIM/kernels" >> ~/.bashrc
+
+##cMcPAT Installation
+cd $HOME/COSSIM/cgem5/McPat/mcpat
+make all
+cd $HOME/COSSIM/cgem5/McPat/Scripts
+chmod +x GEM5ToMcPAT.py
+chmod +x print_energy.py
+
+## cOMNET++ with COSSIM WORKSPACE Installation
+## Download OMNeT++ 5.0 from http://omnetpp.org. Make sure you select to download the generic archive, omnetpp-5.0-src.tgz.
+
+##Untar it in the $HOME directory & execute the following commands:
+cd $HOME
+tar xvfz omnetpp-5.0-src.tgz
+cd omnetpp-5.0
+export PATH=$PATH:$HOME/omnetpp-5.0/bin
+./configure && make
+
+mkdir $HOME/COSSIM/OMNETPP_COSSIM_workspace/OMNET_WORKSPACE/HLANode/simulations
+
+echo "export PATH=$PATH:$HOME/omnetpp-5.0/bin" >> ~/.bashrc
+echo "export OMNETWP=$HOME/COSSIM/OMNETPP_COSSIM_workspace/OMNET_WORKSPACE" >> ~/.bashrc
+source ~/.bashrc
+
+##Execute OMNET++ and import the COSSIM-OMNET workspace (it contains INET-3.2.4 version)
+omnetpp
+##Select Browse -> $HOME -> COSSIM -> OMNETPP_COSSIM_workspace -> OMNET_WORKSPACE -> Press “OK”
+
+##Build OMNET_WORKSPACE
+o	Select Project -> Clean -> Select “INET” -> Select “Start a build immediately” -> Select “Build only the selected projects” -> Press “OK”
+o	Select Project -> Clean -> Select “HLANode” & “test” -> Select “Start a build immediately” -> Select “Build only the selected projects” -> Press “OK”
+
 
 
 

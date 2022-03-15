@@ -32,7 +32,7 @@ simple Txc2 extends Txc0
 //simple Txc3 extends Txc0
 //{
 //		parameters:
-//		RXPacketTime = default(0.00001);
+//		RXPacketTime = default(0.001);
 //		nodeNo = default(3);
 //
 //		sendInitialMessage = default(false);

@@ -12,7 +12,7 @@ import HLANode.SyncNode;
 import HLANode.Txc0;
 import HLANode.Txc1;
 import HLANode.Txc2;
-import HLANode.Txc3;
+//import HLANode.Txc3;
 
 import inet.node.ethernet.EtherSwitch;
 import ned.DatarateChannel;
@@ -49,41 +49,41 @@ module CossimWirelessHostMobile extends AODVRouter
     numRadios = default(1);
 }
 
- 
+
 network ARPTest
 {
     types:
 
 
-        channel ethline_slow extends DatarateChannel
+        channel ethline extends DatarateChannel
         {
             delay = 10ms;
-            datarate = 100Mbps;
+            datarate = 1000Mbps;
         }
     submodules:
 
-        micro_router0: CossimWirelessHostTower {
+//        micro_router0: CossimWirelessHostTower {
+//
+//            @display("p=322,137");
+//        }
+//
+//        micro_router1: CossimWirelessHostMobile {
+//            @display("p=432,182");
+//        }
 
-            @display("p=322,137");
-        }
 
-        micro_router1: CossimWirelessHostMobile {
-            @display("p=432,182");
-        }
-
-
-        radioMedium: Ieee80211ScalarRadioMedium {
-            @display("p=64,350");
-        }
+//        radioMedium: Ieee80211ScalarRadioMedium {
+//            @display("p=64,350");
+//        }
 
 
 
 
         switch1: EtherSwitch {
-            @display("p=203,159");
+            @display("p=305,175");
         }
 
- 
+
         configurator: IPv4NetworkConfigurator {
             //  assignDisjunctSubnetAddresses = true;
             config = xmldoc("config1.xml");
@@ -102,12 +102,12 @@ network ARPTest
         }
         node2: Txc2 {
             parameters:
-                @display("i=device/pc;p=142,289");
+                @display("i=device/pc;p=190,276");
         }
-        node3: Txc3 {
-            parameters:
-                @display("i=device/pc;p=262,289");
-        }
+//        node3: Txc3 {
+//            parameters:
+//                @display("i=device/pc;p=262,289");
+//        }
 
         syncnode: SyncNode {
             parameters:
@@ -117,13 +117,14 @@ network ARPTest
     connections:
         syncnode.out --> {  delay = 0ms; } --> syncnode.in;
 
-        node0.gate <--> ethline_slow <--> micro_router0.ethg++;
-        node1.gate <--> ethline_slow <--> micro_router1.ethg++;        
-        micro_router0.ethg++ <--> ethline_slow <--> switch1.ethg++;
+        //node0.gate <--> ethline <--> micro_router0.ethg++;
+        //node1.gate <--> ethline <--> micro_router1.ethg++;        
+        //micro_router0.ethg++ <--> ethline <--> switch1.ethg++;
 
 
-        node2.gate <--> ethline_slow <--> switch1.ethg++;
-        node3.gate <--> ethline_slow <--> switch1.ethg++;
+        node0.gate <--> ethline <--> switch1.ethg++;
+        node1.gate <--> ethline <--> switch1.ethg++;
+        node2.gate <--> ethline <--> switch1.ethg++;
 
 
 }

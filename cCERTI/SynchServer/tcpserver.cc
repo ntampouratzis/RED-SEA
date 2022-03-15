@@ -1,9 +1,9 @@
 /*
  * ----------------------------------------------------------------------------
  * Synchronization Server. It is used to initiate the HLA Federations.
- * Copyright (c) 2022, H2020 COSSIM.
- * Copyright (c) 2022, EXAPSYS
- * Author: Nikolaos Tampouratzis, tampouratzis@exapsys.eu
+ * Copyright (c) 2018, H2020 COSSIM.
+ * Copyright (c) 2018, Telecommunications Systems Institute.
+ * Author: Nikolaos Tampouratzis, ntampouratzis@isc.tuc.gr
  * ----------------------------------------------------------------------------
  */
 

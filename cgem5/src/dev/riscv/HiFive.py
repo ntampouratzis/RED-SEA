@@ -1,4 +1,5 @@
 # Copyright (c) 2021 Huawei International
+# Copyright (c) 2022 EXAscale Performance SYStems (EXAPSYS)
 # All rights reserved.
 #
 # The license below extends only to copyright in the software and shall
@@ -44,52 +45,57 @@ from m5.params import *
 from m5.proxy import *
 from m5.util.fdthelper import *
 
+from m5.objects.PciHost import GenericPciHost
+
+class GenericRiscvPciHost(GenericPciHost):
+    type = 'GenericRiscvPciHost'
+    cxx_header = "dev/riscv/pci_host.hh"
+    cxx_class = 'gem5::GenericRiscvPciHost'
+    int_base = Param.Int(0x10,
+                        "Base number used as interrupt line and PLIC source.")
+    int_count = Param.Unsigned(4,
+                        "Maximum number of interrupts used by this host")
+    # This python parameter can be used in configuration scripts to turn
+    # on/off the fdt dma-coherent flag when doing dtb autogeneration
+    _dma_coherent = True
+
 class HiFive(Platform):
     """HiFive Platform
-
     Implementation:
         This is the base class for SiFive's HiFive
         board series. It contains the CLINT and PLIC
         interrupt controllers, Uart and Disk.
-
         Implementation details are based on SiFive
         FU540-C000. https://sifive.cdn.prismic.io/
         sifive/b5e7a29c-d3c2-44ea-85fb-acc1df282e2
         1_FU540-C000-v1p3.pdf
-
     Setup:
         The following sections outline the required
         setup for a RISC-V HiFive platform. See
         configs/example/riscv/fs_linux.py for example.
-
     Driving CLINT:
         CLINT has an interrupt pin which increments
         mtime. It can be connected to any interrupt
         source pin which acts as the RTCCLK pin. An
         abstract RTC wrapper called RiscvRTC can be
         used.
-
     Attaching PLIC devices:
         PLIC handles external interrupts. Interrupt
         PioDevices should inherit from PlicIntDevice
         (PCI and DMA not yet implemented). It contains
         a parameter interrupt_id which should be used
         to call platform->postPciInt(id).
-
         All PLIC interrupt devices should be returned
         by _off_chip_devices(). Calling attachPlic sets
         up the PLIC interrupt source count.
-
     Uart:
         The HiFive platform also has an uart_int_id.
         This is because Uart8250 uses postConsoleInt
         instead of postPciInt. In the future if a Uart
         that inherits PlicIntDevice is implemented,
         this can be removed.
-
     Disk:
         See fs_linux.py for setup example.
-
     PMAChecker:
         The PMAChecker will be attached to the MMU of
         each CPU (which allows them to differ). See
@@ -104,13 +110,22 @@ class HiFive(Platform):
 
     # PLIC
     plic = Param.Plic(Plic(pio_addr=0xc000000), "PLIC")
+    
+    #PCI
+    pci_host = GenericRiscvPciHost(conf_base=0x30000000, conf_size='256MB',
+        conf_device_bits=12, pci_pio_base=0x2f000000, pci_mem_base=0x40000000)
 
     # Uart
     uart = RiscvUart8250(pio_addr=0x10000000)
     # Int source ID to redirect console interrupts to
     # Set to 0 if using a pci interrupt for Uart instead
     uart_int_id = Param.Int(0xa, "PLIC Uart interrupt ID")
-    terminal = Terminal()
+    
+    def attachRISCVTerminal(self, cossim_enabled=False, nodeNum=0): #COSSIM
+        if cossim_enabled:
+            self.terminal = Terminal(port=(3000+nodeNum))
+        else:
+            self.terminal = Terminal()
 
     def _on_chip_devices(self):
         """Returns a list of on-chip peripherals
@@ -151,7 +166,8 @@ class HiFive(Platform):
     def attachPlic(self):
         """Count number of PLIC interrupt sources
         """
-        plic_srcs = [self.uart_int_id]
+        plic_srcs = [self.uart_int_id, self.pci_host.int_base
+                     + self.pci_host.int_count]
         for device in self._off_chip_devices():
             if hasattr(device, "interrupt_id"):
                 plic_srcs.append(device.interrupt_id)
@@ -159,14 +175,14 @@ class HiFive(Platform):
 
     def attachOnChipIO(self, bus):
         """Attach on-chip IO devices, needs modification
-            to support DMA and PCI
+            to support DMA
         """
         for device in self._on_chip_devices():
             device.pio = bus.mem_side_ports
 
     def attachOffChipIO(self, bus):
         """Attach off-chip IO devices, needs modification
-            to support DMA and PCI
+            to support DMA
         """
         for device in self._off_chip_devices():
             device.pio = bus.mem_side_ports

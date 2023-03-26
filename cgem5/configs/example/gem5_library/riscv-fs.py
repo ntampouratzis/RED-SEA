@@ -28,8 +28,10 @@
 This example runs a simple linux boot. It uses the 'riscv-disk-img' resource.
 It is built with the sources in `src/riscv-fs` in [gem5 resources](
 https://gem5.googlesource.com/public/gem5-resources).
+
 Characteristics
 ---------------
+
 * Runs exclusively on the RISC-V ISA with the classic caches
 * Assumes that the kernel is compiled into the bootloader
 * Automatically generates the DTB file
@@ -40,10 +42,9 @@ Characteristics
 from gem5.components.boards.riscv_board import RiscvBoard
 from gem5.components.memory import SingleChannelDDR3_1600
 from gem5.components.processors.simple_processor import SimpleProcessor
-from gem5.components.cachehierarchies.classic.\
-    private_l1_private_l2_cache_hierarchy import (
-        PrivateL1PrivateL2CacheHierarchy,
-    )
+from gem5.components.cachehierarchies.classic.private_l1_private_l2_cache_hierarchy import (
+    PrivateL1PrivateL2CacheHierarchy,
+)
 from gem5.components.processors.cpu_types import CPUTypes
 from gem5.isas import ISA
 from gem5.utils.requires import requires
@@ -66,6 +67,7 @@ requires(isa_required=ISA.RISCV)
 cache_hierarchy = PrivateL1PrivateL2CacheHierarchy(
     l1d_size="32KiB", l1i_size="32KiB", l2_size="512KiB"
 )
+
 
 # ----------------------------- Add Options (COSSIM) ---------------------------- #
 parser = argparse.ArgumentParser()
@@ -118,7 +120,9 @@ args = parser.parse_args()
 memory = SingleChannelDDR3_1600(size = args.mem_size)
 
 # Setup a single core Processor.
-processor = SimpleProcessor(cpu_type=CPUTypes.TIMING, num_cores=args.num_cores)
+processor = SimpleProcessor(
+    cpu_type=CPUTypes.TIMING, isa=ISA.RISCV, num_cores=args.num_cores
+)
 
 # Setup the board.
 board = RiscvBoard(
@@ -131,6 +135,12 @@ board = RiscvBoard(
 board.platform.attachRISCVTerminal(args.cossim, args.nodeNum) #COSSIM
 
 board.readScript(args.script) #COSSIM
+
+# Set the Full System workload.
+board.set_kernel_disk_workload(
+    kernel=Resource("riscv-bootloader-vmlinux-5.10"),
+    disk_image=Resource("riscv-disk-img"),
+)
 
 # ----------------------------- Add specific kernel & image (COSSIM) ---------------------------- #
 kernel_path = os.getenv('M5_PATH') + "/binaries/" + args.kernel

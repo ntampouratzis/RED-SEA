@@ -26,20 +26,25 @@
 
 from abc import abstractmethod
 
+from .abstract_board import AbstractBoard
 from ...resources.resource import AbstractResource
 
-from typing import List, Optional
+from typing import List, Optional, Union
 import os
+from pathlib import Path
 
 import m5
+
 
 class KernelDiskWorkload:
     """
     The purpose of this abstract class is to enable a full-system boot
     consisting of of a kernel which will then load a disk image.
+
     For this to function correctly, the KernelDiskWorkload class should be
     added as a superclass to a board and the abstract methods implemented.
     E.g.:
+
     ```
     class X86Board(AbstractBoard, KernelDiskWorkload):
         ...
@@ -53,8 +58,10 @@ class KernelDiskWorkload:
             ]
         ...
     ```
+
     Notes
     -----
+
     * This assumes only one disk is set.
     * This assumes the Linux kernel is used.
     """
@@ -65,7 +72,9 @@ class KernelDiskWorkload:
         Returns a default list of arguments for the workload kernel. We assume
         the following strings may be used as placeholders, to be replaced when
         `set_kernel_disk_workload` is executed:
+
         * `{root_value}` : set to `get_default_kernel_root_val()`.
+
         :returns: A default list of arguments for the workload kernel.
         """
         raise NotImplementedError
@@ -74,6 +83,7 @@ class KernelDiskWorkload:
     def get_disk_device(self) -> str:
         """
         Get the disk device, e.g., "/dev/sda", where the disk image is placed.
+
         :returns: The disk device.
         """
         raise NotImplementedError
@@ -82,8 +92,10 @@ class KernelDiskWorkload:
     def _add_disk_to_board(self, disk_image: AbstractResource) -> None:
         """
         Sets the configuration needed to add the disk image to the board.
+
         **Note:** This will be executed at the end of the
         `set_kernel_disk_workload` function.
+
         :param disk_image: The disk image to add to the system.
         """
         raise NotImplementedError
@@ -94,6 +106,7 @@ class KernelDiskWorkload:
         """
         Obtains the root partition of a disk image by inspecting the resource's
         metadata.
+
         :returns: The disk image's root partition.
         """
         try:
@@ -109,6 +122,8 @@ class KernelDiskWorkload:
         determined by the value implemented in the `get_disk_device()`
         function, and the disk image partition, obtained from
         `get_disk_root_partition()`
+
+
         :param disk_image: The disk image to be added to the system.
         :returns: The default value for the 'root' argument to be passed to the
         kernel.
@@ -121,17 +136,22 @@ class KernelDiskWorkload:
         self,
         kernel: AbstractResource,
         disk_image: AbstractResource,
+        bootloader: Optional[AbstractResource] = None,
         readfile: Optional[str] = None,
         readfile_contents: Optional[str] = None,
         kernel_args: Optional[List[str]] = None,
         exit_on_work_items: bool = True,
+        checkpoint: Optional[Union[Path, AbstractResource]] = None,
         fast_boot_ubuntu: Optional[bool] = False,
     ) -> None:
         """
         This function allows the setting of a full-system run with a Kernel
         and a disk image.
+
         :param kernel: The kernel to boot.
         :param disk_image: The disk image to mount.
+        :param bootloader: The current implementation of the ARM board requires
+        three resources to operate -- kernel, disk image, and, a bootloader.
         :param readfile: An optional parameter stating the file to be read by
         by `m5 readfile`.
         :param readfile_contents: An optional parameter stating the contents of
@@ -142,7 +162,17 @@ class KernelDiskWorkload:
         passed to the kernel. By default set to `get_default_kernel_args()`.
         :param exit_on_work_items: Whether the simulation should exit on work
         items. True by default.
+        :param checkpoint: The checkpoint directory. Used to restore the
+        simulation to that checkpoint.
         """
+
+        # We assume this this is in a multiple-inheritance setup with an
+        # Abstract board. This function will not work otherwise.
+        assert isinstance(self, AbstractBoard)
+
+        # If we are setting a workload of this type, we need to run as a
+        # full-system simulation.
+        self._set_fullsystem(True)
 
         # Set the kernel to use.
         self.workload.object_file = kernel.get_local_path()
@@ -156,6 +186,13 @@ class KernelDiskWorkload:
         
         if (fast_boot_ubuntu):
             self.workload.command_line += ' init=/root/gem5_init.sh'
+
+        # Setting the bootloader information for ARM board. The current
+        # implementation of the ArmBoard class expects a boot loader file to be
+        # provided along with the kernel and the disk image.
+
+        if bootloader is not None:
+            self._bootloader = [bootloader.get_local_path()]
 
         # Set the readfile.
         if readfile:
@@ -173,3 +210,17 @@ class KernelDiskWorkload:
 
         # Set whether to exit on work items.
         self.exit_on_work_items = exit_on_work_items
+
+        # Here we set `self._checkpoint_dir`. This is then used by the
+        # Simulator module to setup checkpoints.
+        if checkpoint:
+            if isinstance(checkpoint, Path):
+                self._checkpoint = checkpoint
+            elif isinstance(checkpoint, AbstractResource):
+                self._checkpoint = Path(checkpoint.get_local_path())
+            else:
+                # The checkpoint_dir must be None, Path, Or AbstractResource.
+                raise Exception(
+                    "Checkpoints must be passed as a Path or an "
+                    "AbstractResource."
+                )

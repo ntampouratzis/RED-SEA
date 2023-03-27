@@ -167,7 +167,7 @@ node1 root \
 node2 root
 
 ## 7. Create a host_file in Ubuntu 18.04 simulated image
-You need to create a host_file in order to tell the MPI where the application must be executed
+You need to create a host_file in order to declare the MPI-ranks which will be executed per COSSIM node
 
 ```
 vi host_file

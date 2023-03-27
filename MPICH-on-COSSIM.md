@@ -1,4 +1,4 @@
-# How to execute MPICH on COSSIM?
+# How to execute MPICH on COSSIM framework?
 
 # Setup the COSSIM environment
 

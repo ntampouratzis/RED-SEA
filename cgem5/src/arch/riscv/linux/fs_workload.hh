@@ -29,7 +29,10 @@
 #ifndef __ARCH_RISCV_LINUX_SYSTEM_HH__
 #define __ARCH_RISCV_LINUX_SYSTEM_HH__
 
+#include <string> //COSSIM
+
 #include "arch/riscv/remote_gdb.hh"
+#include "params/RiscvBootloaderKernelWorkload.hh" //COSSIM
 #include "params/RiscvLinux.hh"
 #include "sim/kernel_workload.hh"
 
@@ -51,11 +54,73 @@ class FsLinux : public KernelWorkload
     setSystem(System *sys) override
     {
         KernelWorkload::setSystem(sys);
-        gdb = BaseRemoteGDB::build<RemoteGDB>(system);
+        gdb = BaseRemoteGDB::build<RemoteGDB>(
+                params().remote_gdb_port, system);
     }
 
     ByteOrder byteOrder() const override { return ByteOrder::little; }
 };
+
+/* ----- ADD COSSIM ----- */
+
+class BootloaderKernelWorkload: public Workload
+{
+  private:
+    Addr entryPoint = 0;
+    loader::ObjectFile *kernel = nullptr;
+    loader::ObjectFile *bootloader = nullptr;
+    loader::SymbolTable kernelSymbolTable;
+    loader::SymbolTable bootloaderSymbolTable;
+    const std::string bootArgs;
+
+  private:
+    void loadBootloaderSymbolTable();
+    void loadKernelSymbolTable();
+    void loadBootloader();
+    void loadKernel();
+    void loadDtb();
+
+  public:
+    PARAMS(RiscvBootloaderKernelWorkload);
+    BootloaderKernelWorkload(const Params &p)
+        : Workload(p), entryPoint(p.entry_point), bootArgs(p.boot_args)
+    {
+        loadBootloaderSymbolTable();
+        loadKernelSymbolTable();
+    }
+
+    void initState() override;
+
+    void
+    setSystem(System *sys) override
+    {
+        Workload::setSystem(sys);
+        gdb = BaseRemoteGDB::build<RemoteGDB>(
+            params().remote_gdb_port, system);
+    }
+
+    Addr getEntry() const override { return entryPoint; }
+
+    ByteOrder byteOrder() const override { return ByteOrder::little; }
+
+    loader::Arch getArch() const override { return kernel->getArch(); }
+
+    const loader::SymbolTable &
+    symtab(ThreadContext *tc) override
+    {
+        return kernelSymbolTable;
+    }
+
+    bool
+    insertSymbol(const loader::Symbol &symbol) override
+    {
+        return kernelSymbolTable.insert(symbol);
+    }
+
+    void serialize(CheckpointOut &checkpoint) const override;
+    void unserialize(CheckpointIn &checkpoint) override;
+};
+/* ----- END ADD COSSIM ----- */
 
 } // namespace RiscvISA
 } // namespace gem5

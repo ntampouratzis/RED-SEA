@@ -78,8 +78,11 @@ cpu_types = {
 
 def create_cow_image(name):
     """Helper function to create a Copy-on-Write disk image"""
-    image = CowDiskImage()
-    image.child.image_file = SysPaths.disk(name)
+    #image = CowDiskImage()
+    #image.child.image_file = SysPaths.disk(name)
+
+    image = RawDiskImage(read_only=False)
+    image.image_file = SysPaths.disk(name)
 
     return image
 
@@ -88,7 +91,7 @@ def create(args):
     """Create and configure the system object."""
 
     if args.script and not os.path.isfile(args.script):
-        print("Error: Bootscript %s does not exist" % args.script)
+        print(f"Error: Bootscript {args.script} does not exist")
         sys.exit(1)
 
     cpu_class = cpu_types[args.cpu][0]
@@ -130,8 +133,14 @@ def create(args):
 
     # Add CPU clusters to the system
     system.cpu_cluster = [
-        devices.CpuCluster(
-            system, args.num_cores, args.cpu_freq, "1.0V", *cpu_types[args.cpu]
+        devices.ArmCpuCluster(
+            system,
+            args.num_cores,
+            args.cpu_freq,
+            "1.0V",
+            *cpu_types[args.cpu],
+            tarmac_gen=args.tarmac_gen,
+            tarmac_dest=args.tarmac_dest,
         )
     ]
 
@@ -165,13 +174,18 @@ def create(args):
         # memory layout.
         "norandmaps",
         # Tell Linux where to find the root disk image.
-        "root=%s" % args.root_device,
+        f"root={args.root_device}",
         # Mount the root disk read-write by default.
         "rw",
         # Tell Linux about the amount of physical memory present.
-        "mem=%s" % args.mem_size,
+        f"mem={args.mem_size}",
     ]
     system.workload.command_line = " ".join(kernel_cmd)
+
+    if args.with_pmu:
+        for cluster in system.cpu_cluster:
+            interrupt_numbers = [args.pmu_ppi_number] * len(cluster)
+            cluster.addPMUs(interrupt_numbers)
 
     return system
 
@@ -180,9 +194,9 @@ def addEthernet(system, options): #COSSIM
     dev = IGbE_e1000()
     system.attach_pci(dev)
     system.ethernet = dev
-    
+
     system.etherlink = COSSIMEtherLink(nodeNum=options.nodeNum, TotalNodes=options.TotalNodes, sys_clk=options.sys_clock,SynchTime=options.SynchTime, RxPacketTime=options.RxPacketTime) #system_clock is used for synchronization
-    
+
     system.etherlink.interface = Parent.system.ethernet.interface
     if options.etherdump:
         system.etherdump = EtherDump(file=options.etherdump)
@@ -193,14 +207,13 @@ def addStandAloneEthernet(system, options): #COSSIM
     dev = IGbE_e1000()
     system.attach_pci(dev)
     system.ethernet = dev
-    
+
     system.etherlink = EtherLink()
-    
+
     system.etherlink.int0 = Parent.system.ethernet.interface
     if options.etherdump:
         system.etherdump = EtherDump(file=options.etherdump)
         system.etherlink.dump = system.etherdump
-
 
 def run(args):
     # Remove existing files from previous simulation (COSSIM)
@@ -211,7 +224,7 @@ def run(args):
     # END Remove existing files from previous simulation (COSSIM)
     cptdir = m5.options.outdir
     if args.checkpoint:
-        print("Checkpoint directory: %s" % cptdir)
+        print(f"Checkpoint directory: {cptdir}")
 
     while True:
         event = m5.simulate()
@@ -222,10 +235,10 @@ def run(args):
             m5.checkpoint(os.path.join(cpt_dir))
             print("Checkpoint done.")
         else:
-            print(exit_msg, " @ ", m5.curTick())
+            print(f"{exit_msg} ({event.getCode()}) @ {m5.curTick()}")
             break
 
-    # Execute the McPat Script (COSSIM)   
+    # Execute the McPat Script (COSSIM)
     if exit_msg == "m5_exit instruction encountered":
         McPATXml = args.McPATXml #Specify the McPAT xml ProcessorDescriptionFile
         if McPATXml == "empty":
@@ -235,7 +248,14 @@ def run(args):
             os.system("$GEM5/runMcPat.sh " + str(NodeNum) + " " + str(McPATXml) + " &")
     # END Execute the McPat Script (COSSIM)
 
-    sys.exit(event.getCode())
+
+def arm_ppi_arg(int_num: int) -> int:
+    """Argparse argument parser for valid Arm PPI numbers."""
+    # PPIs (1056 <= int_num <= 1119) are not yet supported by gem5
+    int_num = int(int_num)
+    if 16 <= int_num <= 31:
+        return int_num
+    raise ValueError(f"{int_num} is not a valid Arm PPI number")
 
 
 def main():
@@ -263,9 +283,7 @@ def main():
         "--root-device",
         type=str,
         default=default_root_device,
-        help="OS device name for root partition (default: {})".format(
-            default_root_device
-        ),
+        help=f"OS device name for root partition (default: {default_root_device})",
     )
     parser.add_argument(
         "--script", type=str, default="", help="Linux bootscript"
@@ -303,34 +321,57 @@ def main():
         default="2GB",
         help="Specify the physical memory size",
     )
+    parser.add_argument(
+        "--tarmac-gen",
+        action="store_true",
+        help="Write a Tarmac trace.",
+    )
+    parser.add_argument(
+        "--tarmac-dest",
+        choices=TarmacDump.vals,
+        default="stdoutput",
+        help="Destination for the Tarmac trace output. [Default: stdoutput]",
+    )
+    parser.add_argument(
+        "--with-pmu",
+        action="store_true",
+        help="Add a PMU to each core in the cluster.",
+    )
+    parser.add_argument(
+        "--pmu-ppi-number",
+        type=arm_ppi_arg,
+        default=23,
+        help="The number of the PPI to use to connect each PMU to its core. "
+        "Must be an integer and a valid PPI number (16 <= int_num <= 31).",
+    )
     parser.add_argument("--checkpoint", action="store_true")
     parser.add_argument("--restore", type=str, default=None)
 
     #COSSIM Options
     parser.add_argument("--cossim", action="store_true",
                       help="COSSIM distributed gem5 simulation.")
-    
+
     parser.add_argument("--nodeNum", action="store", type=int, dest="nodeNum", default=0,
                       help="Specify the number of node")
-    
+
     parser.add_argument("--SynchTime", action="store", type=str, dest="SynchTime",
                       help="Specify the Synchronization Time. For example: --SynchTime=1ms")
-    
+
     parser.add_argument("--RxPacketTime", action="store", type=str, dest="RxPacketTime",
                       help="Specify the minimum time in which the node can accept packet from the OMNET++. For example: --SynchTime=1ms")
-    
+
     parser.add_argument("--TotalNodes", action="store", type=str, dest="TotalNodes", default=1,
                       help="Specify the total number of nodes")
-    
-    parser.add_argument("--sys-clock", action="store", type=str, dest="sys_clock", 
+
+    parser.add_argument("--sys-clock", action="store", type=str, dest="sys_clock",
                       default="1GHz",
                       help = """Top-level clock for blocks running at system
                       speed""")
-    
+
     parser.add_argument("--etherdump", action="store", type=str, default="",
                         help="Specify the filename to dump a pcap capture of"\
                         " the ethernet traffic")
-    
+
     parser.add_argument("--mcpat-xml", action="store", type=str, default="empty", dest="McPATXml",
                       help="Specify the McPAT xml ProcessorDescriptionFile")
 
@@ -338,7 +379,7 @@ def main():
 
     root = Root(full_system=True)
     root.system = create(args)
-    
+
     if args.cossim:                    #COSSIM
         addEthernet(root.system, args) #COSSIM
     else:

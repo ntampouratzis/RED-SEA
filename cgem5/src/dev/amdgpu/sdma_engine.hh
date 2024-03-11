@@ -34,6 +34,7 @@
 
 #include "base/bitunion.hh"
 #include "dev/amdgpu/amdgpu_device.hh"
+#include "dev/amdgpu/pm4_queues.hh"
 #include "dev/amdgpu/sdma_packets.hh"
 #include "dev/dma_virt_device.hh"
 #include "params/SDMAEngine.hh"
@@ -58,13 +59,18 @@ class SDMAEngine : public DmaVirtDevice
         Addr _rptr;
         Addr _wptr;
         Addr _size;
+        Addr _rptr_wb_addr = 0;
+        Addr _global_rptr = 0;
         bool _valid;
         bool _processing;
         SDMAQueue *_parent;
         SDMAQueue *_ib;
+        SDMAType _type;
+        SDMAQueueDesc *_mqd;
+        Addr _mqd_addr = 0;
       public:
         SDMAQueue() : _rptr(0), _wptr(0), _valid(false), _processing(false),
-            _parent(nullptr), _ib(nullptr) {}
+            _parent(nullptr), _ib(nullptr), _type(SDMAGfx), _mqd(nullptr) {}
 
         Addr base() { return _base; }
         Addr rptr() { return _base + _rptr; }
@@ -72,36 +78,49 @@ class SDMAEngine : public DmaVirtDevice
         Addr wptr() { return _base + _wptr; }
         Addr getWptr() { return _wptr; }
         Addr size() { return _size; }
+        Addr rptrWbAddr() { return _rptr_wb_addr; }
+        Addr globalRptr() { return _global_rptr; }
         bool valid() { return _valid; }
         bool processing() { return _processing; }
         SDMAQueue* parent() { return _parent; }
         SDMAQueue* ib() { return _ib; }
+        SDMAType queueType() { return _type; }
+        SDMAQueueDesc* getMQD() { return _mqd; }
+        Addr getMQDAddr() { return _mqd_addr; }
 
         void base(Addr value) { _base = value; }
 
         void
         incRptr(uint32_t value)
         {
-            //assert((_rptr + value) <= (_size << 1));
             _rptr = (_rptr + value) % _size;
+            _global_rptr += value;
         }
 
-        void rptr(Addr value) { _rptr = value; }
+        void
+        rptr(Addr value)
+        {
+            _rptr = value;
+            _global_rptr = value;
+        }
 
         void
         setWptr(Addr value)
         {
-            //assert(value <= (_size << 1));
             _wptr = value % _size;
         }
 
         void wptr(Addr value) { _wptr = value; }
 
         void size(Addr value) { _size = value; }
+        void rptrWbAddr(Addr value) { _rptr_wb_addr = value; }
         void valid(bool v) { _valid = v; }
         void processing(bool value) { _processing = value; }
         void parent(SDMAQueue* q) { _parent = q; }
         void ib(SDMAQueue* ib) { _ib = ib; }
+        void queueType(SDMAType type) { _type = type; }
+        void setMQD(SDMAQueueDesc *mqd) { _mqd = mqd; }
+        void setMQDAddr(Addr mqdAddr) { _mqd_addr = mqdAddr; }
     };
 
     /* SDMA Engine ID */
@@ -137,12 +156,16 @@ class SDMAEngine : public DmaVirtDevice
     void processRLC0(Addr wptrOffset);
     void processRLC1(Addr wptrOffset);
 
+    Addr mmioBase = 0;
+    Addr mmioSize = 0;
+
   public:
     SDMAEngine(const SDMAEngineParams &p);
 
     void setGPUDevice(AMDGPUDevice *gpu_device);
 
     void setId(int _id) { id = _id; }
+    int getId() const { return id; }
     /**
      * Returns the client id for the Interrupt Handler.
      */
@@ -224,6 +247,14 @@ class SDMAEngine : public DmaVirtDevice
                     uint64_t *dmaBuffer);
 
     /**
+     * Methods for getting SDMA MMIO base address and size. These are set by
+     * the python configuration depending on device to allow for flexible base
+     * addresses depending on what GPU is being simulated.
+     */
+    Addr getMmioBase() { return mmioBase; }
+    Addr getMmioSize() { return mmioSize; }
+
+    /**
      * Methods for getting the values of SDMA MMIO registers.
      */
     uint64_t getGfxBase() { return gfxBase; }
@@ -250,7 +281,7 @@ class SDMAEngine : public DmaVirtDevice
     void setGfxDoorbellHi(uint32_t data);
     void setGfxDoorbellOffsetLo(uint32_t data);
     void setGfxDoorbellOffsetHi(uint32_t data);
-    void setGfxSize(uint64_t data);
+    void setGfxSize(uint32_t data);
     void setGfxWptrLo(uint32_t data);
     void setGfxWptrHi(uint32_t data);
     void setPageBaseLo(uint32_t data);
@@ -261,14 +292,14 @@ class SDMAEngine : public DmaVirtDevice
     void setPageDoorbellHi(uint32_t data);
     void setPageDoorbellOffsetLo(uint32_t data);
     void setPageDoorbellOffsetHi(uint32_t data);
-    void setPageSize(uint64_t data);
+    void setPageSize(uint32_t data);
     void setPageWptrLo(uint32_t data);
     void setPageWptrHi(uint32_t data);
 
     /**
      * Methods for RLC queues
      */
-    void registerRLCQueue(Addr doorbell, Addr rb_base);
+    void registerRLCQueue(Addr doorbell, Addr mqdAddr, SDMAQueueDesc *mqd);
     void unregisterRLCQueue(Addr doorbell);
     void deallocateRLCQueues();
 

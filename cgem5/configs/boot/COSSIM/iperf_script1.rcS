@@ -1,0 +1,34 @@
+#!/bin/sh
+nproc
+ifconfig eth0 hw ether 00:90:00:00:00:01
+#ifconfig lo 127.0.0.1                             #Configure the localhost
+#ifconfig eth0 192.168.0.3                            #Configure the Ethernet
+#ifconfig eth0 netmask 255.255.255.0           	  #Configure the Netmask
+ulimit -c unlimited
+
+#sleep 1
+
+#/etc/init.d/xinetd start #Initialize RSH server
+
+#sleep 1
+
+# Here you can put your application
+#hostname node1
+
+#sleep 1
+
+#export PATH=$PATH:/opt/vef_prospector/bin
+#export LD_LIBRARY_PATH=:/opt/vef_prospector/lib/
+#cd /home/ubuntu
+#m5 resetstats
+#nproc
+#ls
+#sync
+# END Here you can put your application
+ip link set dev eth0 up
+ip addr add 10.0.0.2/24 dev eth0
+#sleep 1
+#iperf -l 32M -w 32M -c 10.0.0.1 -i 1 -P 1 -t 2
+
+exec /bin/sh
+#m5 exit

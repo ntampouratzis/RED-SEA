@@ -139,8 +139,6 @@ readMPIDR(ArmSystem *arm_sys, ThreadContext *tc)
 {
     const ExceptionLevel current_el = currEL(tc);
 
-    const bool is_secure = isSecureBelowEL3(tc);
-
     switch (current_el) {
       case EL0:
         // Note: in MsrMrs instruction we read the register value before
@@ -150,7 +148,7 @@ readMPIDR(ArmSystem *arm_sys, ThreadContext *tc)
         warn_once("Trying to read MPIDR at EL0\n");
         [[fallthrough]];
       case EL1:
-        if (ArmSystem::haveEL(tc, EL2) && !is_secure)
+        if (EL2Enabled(tc))
             return tc->readMiscReg(MISCREG_VMPIDR_EL2);
         else
             return getMPIDR(arm_sys, tc);
@@ -626,19 +624,11 @@ mcrMrc15TrapToHyp(const MiscRegIndex misc_reg, ThreadContext *tc, uint32_t iss,
                 break;
               // GICv3 regs
               case MISCREG_ICC_SGI0R:
-                {
-                    auto *isa = static_cast<ArmISA::ISA *>(tc->getIsaPtr());
-                    if (isa->haveGICv3CpuIfc())
-                        trap_to_hyp = hcr.fmo;
-                }
+                trap_to_hyp = hcr.fmo;
                 break;
               case MISCREG_ICC_SGI1R:
               case MISCREG_ICC_ASGI1R:
-                {
-                    auto *isa = static_cast<ArmISA::ISA *>(tc->getIsaPtr());
-                    if (isa->haveGICv3CpuIfc())
-                        trap_to_hyp = hcr.imo;
-                }
+                trap_to_hyp = hcr.imo;
                 break;
               case MISCREG_CNTFRQ ... MISCREG_CNTV_TVAL:
                 // CNTFRQ may be trapped only on reads

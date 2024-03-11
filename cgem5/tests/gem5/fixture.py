@@ -170,12 +170,11 @@ class SConsFixture(UniqueFixture):
             )
         else:
             log.test_log.message(
-                "Building the following targets." " This may take a while."
+                "Building the following targets. This may take a while."
             )
-            log.test_log.message("%s" % (", ".join(self.targets)))
+            log.test_log.message(f"{', '.join(self.targets)}")
             log.test_log.message(
-                "You may want to run with only a single ISA"
-                "(--isa=), use --skip-build, or use 'rerun'."
+                "You may want to use --skip-build, or use 'rerun'."
             )
 
         command.extend(self.targets)
@@ -189,7 +188,7 @@ class Gem5Fixture(SConsFixture):
         target_dir = joinpath(config.build_dir, isa.upper())
         if protocol:
             target_dir += "_" + protocol
-        target = joinpath(target_dir, "gem5.%s" % variant)
+        target = joinpath(target_dir, f"gem5.{variant}")
         obj = super(Gem5Fixture, cls).__new__(cls, target)
         return obj
 
@@ -208,7 +207,7 @@ class Gem5Fixture(SConsFixture):
 
 class MakeFixture(Fixture):
     def __init__(self, directory, *args, **kwargs):
-        name = "make -C %s" % directory
+        name = f"make -C {directory}"
         super(MakeFixture, self).__init__(
             build_once=True, lazy_init=False, name=name, *args, **kwargs
         )
@@ -357,7 +356,28 @@ class DownloadedArchive(DownloadedProgram):
         import tarfile
 
         with tarfile.open(self.filename) as tf:
-            tf.extractall(self.path)
+
+            def is_within_directory(directory, target):
+
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+
+                return prefix == abs_directory
+
+            def safe_extract(
+                tar, path=".", members=None, *, numeric_owner=False
+            ):
+
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+
+                tar.extractall(path, members, numeric_owner=numeric_owner)
+
+            safe_extract(tf, self.path)
 
     def _setup(self, testitem):
         # Check to see if there is a file downloaded
@@ -370,7 +390,7 @@ class DownloadedArchive(DownloadedProgram):
             except (urllib.error.URLError, socket.timeout):
                 # Problem checking the server, use the old files.
                 log.test_log.debug(
-                    "Could not contact server. " "Binaries may be old."
+                    "Could not contact server. Binaries may be old."
                 )
                 return
             # If the server version is more recent, download it

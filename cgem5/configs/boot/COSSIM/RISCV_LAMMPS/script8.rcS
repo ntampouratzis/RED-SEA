@@ -1,0 +1,42 @@
+#!/bin/sh
+nproc
+ifconfig eth0 hw ether 00:90:00:00:00:08
+ifconfig lo 127.0.0.1                             #Configure the localhost
+ifconfig eth0 192.168.0.10                            #Configure the Ethernet
+ifconfig eth0 netmask 255.255.255.0           	  #Configure the Netmask
+ulimit -c unlimited
+
+sleep 1
+
+/etc/init.d/xinetd start #Initialize RSH server
+
+cd /home/ubuntu
+echo "node8:8\nnode9:8\nnode10:8\nnode11:8\nnode12:8\nnode13:8\nnode14:8\nnode15:8" >> host_file
+
+cd /root
+echo "node8 root\nnode9 root\nnode10 root\nnode11 root\nnode12 root\nnode13 root\nnode14 root\nnode15 root" >> .rhosts
+
+cd /etc
+echo "192.168.0.10 node8\n192.168.0.11 node9\n192.168.0.12 node10\n192.168.0.13 node11\n192.168.0.14 node12\n192.168.0.15 node13\n192.168.0.16 node14\n192.168.0.17 node15" >> hosts
+
+
+sleep 1
+
+# Here you can put your application
+hostname node8
+
+#sleep 1
+
+export PATH=$PATH:/opt/vef_prospector/bin
+export LD_LIBRARY_PATH=:/opt/vef_prospector/lib/
+export VEFP_IGNORE_NON_MODELLED_CALLS=1
+cd /home/ubuntu/mylammps
+#cd /home/ubuntu
+#m5 resetstats
+nproc
+ls
+sync
+# END Here you can put your application
+
+exec /bin/sh
+#m5 exit

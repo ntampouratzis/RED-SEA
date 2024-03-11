@@ -60,8 +60,7 @@ class Pc(Platform):
     # Serial port and terminal
     com_1 = Uart8250()
     com_1.pio_addr = x86IOAddress(0x3F8)
-    
-    
+
     def attachX86Terminal(self, cossim_enabled, nodeNum): #COSSIM
         if cossim_enabled:
             self.com_1.device = Terminal(port=(3000+nodeNum))

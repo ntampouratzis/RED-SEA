@@ -1,0 +1,7 @@
+GEM5 commit: https://github.com/gem5/gem5/commit/334df18dce9857fb33b96d991dee5d12001450e4
+https://github.com/gem5/gem5/commit/1cdec307c835ff1b7b19cb85a859dbc7df308082
+
+Build OpenSBI: 
+https://github.com/gem5/gem5-resources/pull/13/files
+https://github.com/hnpl/gem5-resources/tree/hn/opensbi
+https://github.com/hnpl/gem5-resources/tree/hn/opensbi/src/riscv-opensbi

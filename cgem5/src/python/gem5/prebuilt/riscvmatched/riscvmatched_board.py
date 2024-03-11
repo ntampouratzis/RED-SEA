@@ -48,7 +48,8 @@ from m5.objects import (
     BadAddr,
     Bridge,
     PMAChecker,
-    RiscvLinux,
+    #RiscvLinux, #COSSIM
+    RiscvBootloaderKernelWorkload,#COSSIM
     AddrRange,
     IOXBar,
     RiscvRTC,
@@ -73,7 +74,7 @@ from m5.util.fdthelper import (
 )
 
 
-def U74Memory():
+def U74Memory(mem_size): #COSSIM
     """
     Memory for the U74 board.
     DDR4 Subsystem with 16GB of memory.
@@ -82,7 +83,7 @@ def U74Memory():
 
     return: ChanneledMemory
     """
-    memory = SingleChannelDDR4_2400("16GB")
+    memory = SingleChannelDDR4_2400(mem_size)
     memory.set_memory_range(
         [AddrRange(start=0x80000000, size=memory.get_size())]
     )
@@ -109,8 +110,10 @@ class RISCVMatchedBoard(
     def __init__(
         self,
         clk_freq: str = "1.2GHz",
-        l2_size: str = "2MB",
+        l2_size: str = "2MiB",
         is_fs: bool = False,
+        mem_size: str = "8GB", #COSSIM
+        num_cores: int = 4,    #COSSIM
     ) -> None:
         """
 
@@ -127,9 +130,9 @@ class RISCVMatchedBoard(
 
         cache_hierarchy = RISCVMatchedCacheHierarchy(l2_size=l2_size)
 
-        memory = U74Memory()
+        memory = U74Memory(mem_size) #COSSIM
 
-        processor = U74Processor(is_fs=is_fs)
+        processor = U74Processor(is_fs=is_fs, num_cores=num_cores) #COSSIM
         super().__init__(
             clk_freq=clk_freq,  # real system is 1.0 to 1.5 GHz
             processor=processor,
@@ -140,7 +143,8 @@ class RISCVMatchedBoard(
     @overrides(AbstractSystemBoard)
     def _setup_board(self) -> None:
         if self._fs:
-            self.workload = RiscvLinux()
+            #self.workload = RiscvLinux() #COSSIM
+            self.workload = RiscvBootloaderKernelWorkload() #COSSIM
 
             # Contains a CLINT, PLIC, UART, and some functions for the dtb, etc.
             self.platform = HiFive()
@@ -184,6 +188,9 @@ class RISCVMatchedBoard(
         else:
             pass
 
+    def readScript(self, script):
+        self.readfile = script #COSSIM
+
     def _setup_io_devices(self) -> None:
         """Connect the I/O devices to the I/O bus in FS mode."""
         if self._fs:
@@ -226,7 +233,7 @@ class RISCVMatchedBoard(
                 # PCI
                 self.bridge.ranges.append(AddrRange(0x2F000000, size="16MB"))
                 self.bridge.ranges.append(AddrRange(0x30000000, size="256MB"))
-                self.bridge.ranges.append(AddrRange(0x40000000, size="512MB"))
+                self.bridge.ranges.append(AddrRange(0x40000000, size="1024MB"))
 
     def _setup_pma(self) -> None:
         """Set the PMA devices on each core"""
@@ -239,7 +246,7 @@ class RISCVMatchedBoard(
         # PCI
         uncacheable_range.append(AddrRange(0x2F000000, size="16MB"))
         uncacheable_range.append(AddrRange(0x30000000, size="256MB"))
-        uncacheable_range.append(AddrRange(0x40000000, size="512MB"))
+        uncacheable_range.append(AddrRange(0x40000000, size="1024MB"))
 
         # TODO: Not sure if this should be done per-core like in the example
         for cpu in self.get_processor().get_cores():
@@ -321,7 +328,7 @@ class RISCVMatchedBoard(
         root.appendCompatible(["riscv-virtio"])
 
         for mem_range in self.mem_ranges:
-            node = FdtNode("memory@%x" % int(mem_range.start))
+            node = FdtNode(f"memory@{int(mem_range.start):x}")
             node.append(FdtPropertyStrings("device_type", ["memory"]))
             node.append(
                 FdtPropertyWords(
@@ -331,6 +338,12 @@ class RISCVMatchedBoard(
                 )
             )
             root.append(node)
+
+        node = FdtNode(f"chosen")                                              #COSSIM
+        bootargs = " ".join(self.get_default_kernel_args())                    #COSSIM
+        node.append(FdtPropertyStrings("bootargs", [bootargs]))                #COSSIM
+        node.append(FdtPropertyStrings("stdout-path", ["/uart@10000000"]))     #COSSIM
+        root.append(node)                                                      #COSSIM
 
         # See Documentation/devicetree/bindings/riscv/cpus.txt for details.
         cpus_node = FdtNode("cpus")
@@ -457,7 +470,7 @@ class RISCVMatchedBoard(
         # Pio address range
         ranges += self.platform.pci_host.pciFdtAddr(space=1, addr=0)
         ranges += soc_state.addrCells(self.platform.pci_host.pci_pio_base)
-        ranges += pci_state.sizeCells(0x10000)  # Fixed size
+        ranges += pci_state.sizeCells(0x1000000)  # Fixed size
 
         # AXI memory address range
         ranges += self.platform.pci_host.pciFdtAddr(space=2, addr=0)
@@ -504,7 +517,8 @@ class RISCVMatchedBoard(
         uart_node.append(
             FdtPropertyWords("interrupt-parent", soc_state.phandle(plic))
         )
-        uart_node.appendCompatible(["ns8250"])
+        uart_node.appendCompatible(["ns8250", "ns16550a"]) #COSSIM
+        #uart_node.appendCompatible(["ns8250"]) #COSSIM
         soc_node.append(uart_node)
 
         # VirtIO MMIO disk node
@@ -544,10 +558,12 @@ class RISCVMatchedBoard(
 
     @overrides(KernelDiskWorkload)
     def _add_disk_to_board(self, disk_image: AbstractResource):
-        image = CowDiskImage(
-            child=RawDiskImage(read_only=True), read_only=False
-        )
-        image.child.image_file = disk_image.get_local_path()
+        #image = CowDiskImage(
+        #    child=RawDiskImage(read_only=True), read_only=False
+        #)
+        #image.child.image_file = disk_image.get_local_path()
+        image = RawDiskImage(read_only=False)
+        image.image_file = disk_image.get_local_path()
         self.disk.vio.image = image
 
         # Note: The below is a bit of a hack. We need to wait to generate the
@@ -557,16 +573,26 @@ class RISCVMatchedBoard(
         self._setup_pma()
 
         # Default DTB address if bbl is built with --with-dts option
-        self.workload.dtb_addr = 0x87E00000
+        #self.workload.dtb_addr = 0x87E00000 #COSSIM
 
         self.generate_device_tree(m5.options.outdir)
         self.workload.dtb_filename = os.path.join(
             m5.options.outdir, "device.dtb"
         )
 
+        self.workload.dtb_addr = 0x87E00000 #COSSIM
+
     @overrides(KernelDiskWorkload)
     def get_default_kernel_args(self) -> List[str]:
-        return ["console=ttyS0", "root={root_value}", "rw"]
+        return [
+            #"console=ttyS0", #COSSIM
+            "earlycon=uart8250,0x10000000", #COSSIM
+            "console=uart8250,0x10000000",  #COSSIM
+            #"root={root_value}",           #COSSIM
+            "root=/dev/vda1",               #COSSIM
+            "disk_device={disk_device}",
+            "rw init=/root/gem5_init.sh", #COSSIM
+        ]
 
     @overrides(KernelDiskWorkload)
     def set_kernel_disk_workload(
@@ -578,8 +604,10 @@ class RISCVMatchedBoard(
         readfile_contents: Optional[str] = None,
         kernel_args: Optional[List[str]] = None,
         exit_on_work_items: bool = True,
+        fast_boot_ubuntu: Optional[bool] = False, #COSSIM
     ) -> None:
-        self.workload = RiscvLinux()
+        #self.workload = RiscvLinux() #COSSIM
+        self.workload = RiscvBootloaderKernelWorkload() #COSSIM
         KernelDiskWorkload.set_kernel_disk_workload(
             self=self,
             kernel=kernel,

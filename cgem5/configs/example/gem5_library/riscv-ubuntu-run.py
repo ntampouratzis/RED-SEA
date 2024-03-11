@@ -52,14 +52,14 @@ from gem5.isas import ISA
 from gem5.simulate.simulator import Simulator
 from gem5.resources.workload import Workload
 
-from gem5.resources.resource import Resource, CustomDiskImageResource #COSSIM
+from gem5.resources.resource import Resource, DiskImageResource, KernelResource #COSSIM
 
 import os, argparse #COSSIM
 
 from m5.objects import EtherLink, COSSIMEtherLink, EtherDump #COSSIM
 
 default_kernel = 'riscv-bootloader-vmlinux-5.10-PCI' #COSSIM
-default_disk   = 'riscv-ubuntu.img'
+default_disk   = 'riscv-ubuntu.img' #COSSIM
 
 # This runs a check to ensure the gem5 binary is compiled for RISCV.
 
@@ -72,7 +72,7 @@ from gem5.components.cachehierarchies.classic.private_l1_private_l2_cache_hierar
 
 # Here we setup the parameters of the l1 and l2 caches.
 cache_hierarchy = PrivateL1PrivateL2CacheHierarchy(
-    l1d_size="16kB", l1i_size="16kB", l2_size="256kB"
+    l1d_size="32kB", l1i_size="32kB", l2_size="2048kB"
 )
 
 
@@ -87,20 +87,20 @@ parser.add_argument("--disk-image", type=str,
 
 parser.add_argument("--cossim", action="store_true",
                       help="COSSIM distributed gem5 simulation.")
-    
+
 parser.add_argument("--nodeNum", action="store", type=int, dest="nodeNum", default=0,
                       help="Specify the number of node")
-    
+
 parser.add_argument("--SynchTime", action="store", type=str, dest="SynchTime",
                       help="Specify the Synchronization Time. For example: --SynchTime=1ms")
-    
+
 parser.add_argument("--RxPacketTime", action="store", type=str, dest="RxPacketTime",
                       help="Specify the minimum time in which the node can accept packet from the OMNET++. For example: --SynchTime=1ms")
-    
+
 parser.add_argument("--TotalNodes", action="store", type=str, dest="TotalNodes", default=1,
                       help="Specify the total number of nodes")
-    
-parser.add_argument("--sys-clock", action="store", type=str, dest="sys_clock", 
+
+parser.add_argument("--sys-clock", action="store", type=str, dest="sys_clock",
                       default="1GHz",
                       help = """Top-level clock for blocks running at system
                       speed""")
@@ -112,7 +112,7 @@ parser.add_argument("--etherdump", action="store", type=str, default="",
 parser.add_argument("--script", type=str, default="",
                         help = "Linux bootscript")
 
-parser.add_argument("--num-cores", type=int, default=2,
+parser.add_argument("--num-cores", type=int, default=8,
                         help="Number of CPU cores")
 
 parser.add_argument("--mem-size", action="store", type=str,
@@ -123,22 +123,22 @@ args = parser.parse_args()
 # ---------------------------- Parse Options --------------------------- #
 
 # Memory: Dual Channel DDR4 2400 DRAM device.
-
-memory = DualChannelDDR4_2400(size=args.mem_size)
+memory = DualChannelDDR4_2400(size="8GB")
 
 # Here we setup the processor. We use a simple processor.
 processor = SimpleProcessor(
-    cpu_type=CPUTypes.TIMING, isa=ISA.RISCV, num_cores=args.num_cores
+    cpu_type=CPUTypes.TIMING, isa=ISA.RISCV, num_cores=16
 )
 
 # Here we setup the board. The RiscvBoard allows for Full-System RISCV
 # simulations.
 board = RiscvBoard(
-    clk_freq="3GHz",
+    clk_freq="1.4GHz",
     processor=processor,
     memory=memory,
     cache_hierarchy=cache_hierarchy,
 )
+
 
 board.platform.attachRISCVTerminal(args.cossim, args.nodeNum) #COSSIM
 
@@ -154,13 +154,13 @@ board.readScript(args.script) #COSSIM
 kernel_path = os.getenv('M5_PATH') + "/binaries/" + args.kernel
 image_path  = os.getenv('M5_PATH') + "/disks/"    + args.disk_image
 
-kernel_custom=CustomDiskImageResource( #COSSIM PCI Kernel
+kernel_custom=KernelResource( #COSSIM PCI Kernel
     local_path = kernel_path
 )
 
-image_custom = CustomDiskImageResource(
+image_custom = DiskImageResource(
     local_path = image_path,
-    disk_root_partition = "1",
+    root_partition = "1",
 )
 
 # Set the Full System workload.
@@ -175,7 +175,7 @@ board.set_kernel_disk_workload(
 # ----------------------------- END Add specific image (COSSIM) ---------------------------- #
 
 if args.cossim: #COSSIM
-    board.etherlink = COSSIMEtherLink(nodeNum=args.nodeNum, TotalNodes=args.TotalNodes, sys_clk=args.sys_clock,SynchTime=args.SynchTime, RxPacketTime=args.RxPacketTime) #system_clock is used for synchronization     
+    board.etherlink = COSSIMEtherLink(nodeNum=args.nodeNum, TotalNodes=args.TotalNodes, sys_clk=args.sys_clock,SynchTime=args.SynchTime, RxPacketTime=args.RxPacketTime) #system_clock is used for synchronization
     board.etherlink.interface = board.ethernet.interface
 else:
     board.etherlink = EtherLink()
@@ -184,6 +184,7 @@ else:
 if args.etherdump: #COSSIM
     board.etherdump = EtherDump(file=args.etherdump)
     board.etherlink.dump = board.etherdump
+
 
 simulator = Simulator(board=board)
 simulator.run()

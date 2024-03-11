@@ -39,7 +39,6 @@ from m5.SimObject import SimObject
 
 from m5.objects.Ethernet import NSGigE, IGbE_igb, IGbE_e1000 #COSSIM
 
-
 def x86IOAddress(port):
     IO_address_space_base = 0x8000000000000000
     return IO_address_space_base + port
@@ -77,7 +76,7 @@ class SouthBridge(SimObject):
 
     # IDE controller
     ide = X86IdeController(disks=[], pci_func=0, pci_dev=4, pci_bus=0)
-    
+
     ethernet = IGbE_e1000(pci_bus=0, pci_dev=0, pci_func=0, InterruptLine=1, InterruptPin=1) #COSSIM
 
     def attachIO(self, bus, dma_ports):

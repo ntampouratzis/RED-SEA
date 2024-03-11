@@ -79,7 +79,7 @@ def _using_pdes(root):
     return False
 
 
-class BigCluster(devices.CpuCluster):
+class BigCluster(devices.ArmCpuCluster):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
             ObjectList.cpu_list.get("O3_ARM_v7a_3"),
@@ -87,12 +87,10 @@ class BigCluster(devices.CpuCluster):
             devices.L1D,
             devices.L2,
         ]
-        super(BigCluster, self).__init__(
-            system, num_cpus, cpu_clock, cpu_voltage, *cpu_config
-        )
+        super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
 
-class LittleCluster(devices.CpuCluster):
+class LittleCluster(devices.ArmCpuCluster):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
             ObjectList.cpu_list.get("MinorCPU"),
@@ -100,9 +98,7 @@ class LittleCluster(devices.CpuCluster):
             devices.L1D,
             devices.L2,
         ]
-        super(LittleCluster, self).__init__(
-            system, num_cpus, cpu_clock, cpu_voltage, *cpu_config
-        )
+        super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
 
 class Ex5BigCluster(devices.CpuCluster):
@@ -113,9 +109,7 @@ class Ex5BigCluster(devices.CpuCluster):
             ex5_big.L1D,
             ex5_big.L2,
         ]
-        super(Ex5BigCluster, self).__init__(
-            system, num_cpus, cpu_clock, cpu_voltage, *cpu_config
-        )
+        super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
 
 class Ex5LittleCluster(devices.CpuCluster):
@@ -126,9 +120,7 @@ class Ex5LittleCluster(devices.CpuCluster):
             ex5_LITTLE.L1D,
             ex5_LITTLE.L2,
         ]
-        super(Ex5LittleCluster, self).__init__(
-            system, num_cpus, cpu_clock, cpu_voltage, *cpu_config
-        )
+        super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
 
 def createSystem(options, #COSSIM
@@ -327,35 +319,35 @@ def addOptions(parser):
         action="store_true",
         help="Doesn't run simulation, it generates a DTB only",
     )
-    
+
     #COSSIM Options
     parser.add_argument("--cossim", action="store_true",
                       help="COSSIM distributed gem5 simulation.")
-    
+
     parser.add_argument("--nodeNum", action="store", type=int, dest="nodeNum", default=0,
                       help="Specify the number of node")
-    
+
     parser.add_argument("--SynchTime", action="store", type=str, dest="SynchTime",
                       help="Specify the Synchronization Time. For example: --SynchTime=1ms")
-    
+
     parser.add_argument("--RxPacketTime", action="store", type=str, dest="RxPacketTime",
                       help="Specify the minimum time in which the node can accept packet from the OMNET++. For example: --SynchTime=1ms")
-    
+
     parser.add_argument("--TotalNodes", action="store", type=str, dest="TotalNodes", default=1,
                       help="Specify the total number of nodes")
-    
-    parser.add_argument("--sys-clock", action="store", type=str, dest="sys_clock", 
+
+    parser.add_argument("--sys-clock", action="store", type=str, dest="sys_clock",
                       default="1GHz",
                       help = """Top-level clock for blocks running at system
                       speed""")
-    
+
     parser.add_argument("--etherdump", action="store", type=str, default="",
                         help="Specify the filename to dump a pcap capture of"\
                         " the ethernet traffic")
-    
+
     parser.add_argument("--mcpat-xml", action="store", type=str, default="empty", dest="McPATXml",
                       help="Specify the McPAT xml ProcessorDescriptionFile")
-    
+
     return parser
 
 
@@ -369,10 +361,10 @@ def build(options):
         "lpj=19988480",
         "norandmaps",
         "loglevel=8",
-        "mem=%s" % options.mem_size,
-        "root=%s" % options.root,
+        f"mem={options.mem_size}",
+        f"root={options.root}",
         "rw",
-        "init=%s" % options.kernel_init,
+        f"init={options.kernel_init}",
         "vmalloc=768MB",
     ]
 
@@ -406,7 +398,7 @@ def build(options):
         system.bigCluster = big_model(
             system, options.big_cpus, options.big_cpu_clock
         )
-        system.mem_mode = system.bigCluster.memoryMode()
+        system.mem_mode = system.bigCluster.memory_mode()
         all_cpus += system.bigCluster.cpus
 
     # little cluster
@@ -414,23 +406,24 @@ def build(options):
         system.littleCluster = little_model(
             system, options.little_cpus, options.little_cpu_clock
         )
-        system.mem_mode = system.littleCluster.memoryMode()
+        system.mem_mode = system.littleCluster.memory_mode()
         all_cpus += system.littleCluster.cpus
 
     # Figure out the memory mode
     if (
         options.big_cpus > 0
         and options.little_cpus > 0
-        and system.bigCluster.memoryMode() != system.littleCluster.memoryMode()
+        and system.bigCluster.memory_mode()
+        != system.littleCluster.memory_mode()
     ):
         m5.util.panic("Memory mode missmatch among CPU clusters")
 
     # create caches
     system.addCaches(options.caches, options.last_cache_level)
     if not options.caches:
-        if options.big_cpus > 0 and system.bigCluster.requireCaches():
+        if options.big_cpus > 0 and system.bigCluster.require_caches():
             m5.util.panic("Big CPU model requires caches")
-        if options.little_cpus > 0 and system.littleCluster.requireCaches():
+        if options.little_cpus > 0 and system.littleCluster.require_caches():
             m5.util.panic("Little CPU model requires caches")
 
     # Create a KVM VM and do KVM-specific configuration
@@ -535,15 +528,14 @@ def run(checkpoint_dir=m5.options.outdir):
 def generateDtb(root):
     root.system.generateDtb(os.path.join(m5.options.outdir, "system.dtb"))
 
-
 def addEthernet(system, options): #COSSIM
     # create NIC
     dev = IGbE_e1000()
     system.attach_pci(dev)
     system.ethernet = dev
-    
+
     system.etherlink = COSSIMEtherLink(nodeNum=options.nodeNum, TotalNodes=options.TotalNodes, sys_clk=options.sys_clock,SynchTime=options.SynchTime, RxPacketTime=options.RxPacketTime) #system_clock is used for synchronization
-    
+
     system.etherlink.interface = Parent.system.ethernet.interface
     if options.etherdump:
         system.etherdump = EtherDump(file=options.etherdump)
@@ -554,9 +546,9 @@ def addStandAloneEthernet(system, options): #COSSIM
     dev = IGbE_e1000()
     system.attach_pci(dev)
     system.ethernet = dev
-    
+
     system.etherlink = EtherLink()
-    
+
     system.etherlink.int0 = Parent.system.ethernet.interface
     if options.etherdump:
         system.etherdump = EtherDump(file=options.etherdump)
@@ -570,12 +562,12 @@ def main():
     options = parser.parse_args()
     root = build(options)
     root.apply_config(options.param)
-    
+
     if options.cossim:                    #COSSIM
         addEthernet(root.system, options) #COSSIM
     else:
         addStandAloneEthernet(root.system, options) #COSSIM
-    
+
     instantiate(options)
     if options.dtb_gen:
         generateDtb(root)

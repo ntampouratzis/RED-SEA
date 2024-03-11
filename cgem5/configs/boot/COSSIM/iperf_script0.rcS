@@ -1,0 +1,19 @@
+#!/bin/sh
+ifconfig eth0 hw ether 00:90:00:00:00:00
+ifconfig lo 127.0.0.1                             #Configure the localhost
+#ifconfig eth0 192.168.0.2                            #Configure the Ethernet
+#ifconfig eth0 netmask 255.255.255.0           	  #Configure the Netmask
+ulimit -c unlimited
+
+#/etc/init.d/xinetd start #Initialize RSH server
+
+#m5 resetstats
+
+# Here you can put your application
+ip link set dev eth0 up
+ip addr add 10.0.0.1/24 dev eth0
+#iperf -s -l 32M -w 32M
+# END Here you can put your application
+
+exec /bin/bash
+#/sbin/m5 exit

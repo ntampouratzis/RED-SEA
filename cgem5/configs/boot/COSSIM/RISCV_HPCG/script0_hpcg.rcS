@@ -1,0 +1,42 @@
+#!/bin/sh
+nproc
+ifconfig eth0 hw ether 00:90:00:00:00:00
+ifconfig lo 127.0.0.1                             #Configure the localhost
+ifconfig eth0 192.168.0.2                            #Configure the Ethernet
+ifconfig eth0 netmask 255.255.255.0               #Configure the Netmask
+ulimit -c unlimited
+
+sleep 1
+
+/etc/init.d/xinetd start
+
+#m5 resetstats
+
+cd /home/ubuntu
+rm host_file
+echo "node0:16\nnode1:16\nnode2:16\nnode3:16\nnode4:16\nnode5:16\nnode6:16\nnode7:16" > host_file
+
+sleep 1
+
+# Here you can put your application
+hostname node0
+
+#sleep 1
+
+export PATH=$PATH:/opt/vef_prospector/bin
+export LD_LIBRARY_PATH=:/opt/vef_prospector/lib/
+export VEFP_IGNORE_NON_MODELLED_CALLS=1
+cd /home/ubuntu
+#vmpirun -launcher rsh -n 128 -f ../host_file build/install/bin/lmp -in in.rhodo
+vmpirun -launcher rsh -n 128 -f host_file HPCG/build/bin/xhpcg --nx=16 --ny=16 --nz=16 --npx=8 --npy=4 --npz=4 --rt=1
+#m5 resetstats
+#nproc
+#vmpirun -launcher rsh -n 64 -f host_file HPCG/build/bin/xhpcg --nx=16 --ny=16 --nz=16 --npx=4 --npy=4 --npz=4 --rt=1
+#mpirun -n 64 HPCG/build/bin/xhpcg --nx=16 --ny=16 --nz=16 --npx=4 --npy=4 --npz=4 --rt=1
+#m5 dumpstats
+ls
+sync
+# END Here you can put your application
+m5 dumpstats
+exec /bin/sh
+#m5 exit

@@ -36,6 +36,9 @@ class Workload(SimObject):
     abstract = True
 
     wait_for_remote_gdb = Param.Bool(False, "Wait for a remote GDB connection")
+    remote_gdb_port = Param.HostSocket(
+        7000, "Default port/socket used for remote GDB connection"
+    )
 
     @cxxMethod
     def sendToGdb(self, message):

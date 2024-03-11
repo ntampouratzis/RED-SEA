@@ -54,7 +54,7 @@ from . import params
 from m5.util.dot_writer import do_dot, do_dvfs_dot
 from m5.util.dot_writer_ruby import do_ruby_dot
 
-from .util import fatal
+from .util import fatal, warn
 from .util import attrdict
 
 # define a MaxTick parameter, unsigned 64 bit
@@ -205,6 +205,63 @@ def simulate(*args, **kwargs):
     return sim_out
 
 
+def setMaxTick(tick: int) -> None:
+    """Sets the maximum tick the simulation may run to. When when using the
+    stdlib simulator module, reaching this max tick triggers a
+    `ExitEvent.MAX_TICK` exit event.
+
+    :param tick: the maximum tick (absolute, not relative to the current tick).
+    """
+    if tick <= curTick():
+        warn("Max tick scheduled for the past. This will not be triggered.")
+    _m5.event.setMaxTick(tick=tick)
+
+
+def getMaxTick() -> int:
+    """Returns the current maximum tick."""
+    return _m5.event.getMaxTick()
+
+
+def getTicksUntilMax() -> int:
+    """Returns the current number of ticks until the maximum tick."""
+    return getMaxTick() - curTick()
+
+
+def scheduleTickExitFromCurrent(
+    ticks: int, exit_string: str = "Tick exit reached"
+) -> None:
+    """Schedules a tick exit event from the current tick. I.e., if ticks == 100
+    then an exit event will be scheduled at tick `curTick() + 100`.
+
+    The default `exit_string` value is used by the stdlib Simulator module to
+    declare this exit event as `ExitEvent.SCHEDULED_TICK`.
+
+    :param ticks: The simulation ticks, from `curTick()` to schedule the exit
+    event.
+    :param exit_string: The exit string to return when the exit event is
+    triggered.
+    """
+    scheduleTickExitAbsolute(tick=ticks + curTick(), exit_string=exit_string)
+
+
+def scheduleTickExitAbsolute(
+    tick: int, exit_string: str = "Tick exit reached"
+) -> None:
+    """Schedules a tick exit event using absolute ticks. I.e., if tick == 100
+    then an exit event will be scheduled at tick 100.
+
+    The default `exit_string` value is used by the stdlib Simulator module to
+    declare this exit event as `ExitEvent.SCHEDULED_TICK`.
+
+    :param tick: The absolute simulation tick to schedule the exit event.
+    :param exit_string: The exit string to return when the exit event is
+    triggered.
+    """
+    if tick <= curTick():
+        warn("Tick exit scheduled for the past. This will not be triggered.")
+    _m5.event.exitSimLoop(exit_string, 0, tick, 0, False)
+
+
 def drain():
     """Drain the simulator in preparation of a checkpoint or memory mode
     switch.
@@ -301,36 +358,35 @@ def switchCpus(system, cpuList, verbose=True):
     memory_mode_name = new_cpus[0].memory_mode()
     for old_cpu, new_cpu in cpuList:
         if not isinstance(old_cpu, objects.BaseCPU):
-            raise TypeError("%s is not of type BaseCPU" % old_cpu)
+            raise TypeError(f"{old_cpu} is not of type BaseCPU")
         if not isinstance(new_cpu, objects.BaseCPU):
-            raise TypeError("%s is not of type BaseCPU" % new_cpu)
+            raise TypeError(f"{new_cpu} is not of type BaseCPU")
         if new_cpu in old_cpu_set:
             raise RuntimeError(
-                "New CPU (%s) is in the list of old CPUs." % (old_cpu,)
+                f"New CPU ({old_cpu}) is in the list of old CPUs."
             )
         if not new_cpu.switchedOut():
-            raise RuntimeError("New CPU (%s) is already active." % (new_cpu,))
+            raise RuntimeError(f"New CPU ({new_cpu}) is already active.")
         if not new_cpu.support_take_over():
             raise RuntimeError(
-                "New CPU (%s) does not support CPU handover." % (old_cpu,)
+                f"New CPU ({old_cpu}) does not support CPU handover."
             )
         if new_cpu.memory_mode() != memory_mode_name:
             raise RuntimeError(
-                "%s and %s require different memory modes."
-                % (new_cpu, new_cpus[0])
+                f"{new_cpu} and {new_cpus[0]} require different memory modes."
             )
         if old_cpu.switchedOut():
-            raise RuntimeError("Old CPU (%s) is inactive." % (new_cpu,))
+            raise RuntimeError(f"Old CPU ({new_cpu}) is inactive.")
         if not old_cpu.support_take_over():
             raise RuntimeError(
-                "Old CPU (%s) does not support CPU handover." % (old_cpu,)
+                f"Old CPU ({old_cpu}) does not support CPU handover."
             )
 
     MemoryMode = params.allEnums["MemoryMode"]
     try:
         memory_mode = MemoryMode(memory_mode_name).getValue()
     except KeyError:
-        raise RuntimeError("Invalid memory mode (%s)" % memory_mode_name)
+        raise RuntimeError(f"Invalid memory mode ({memory_mode_name})")
 
     drain()
 

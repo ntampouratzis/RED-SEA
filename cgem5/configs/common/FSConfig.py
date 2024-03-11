@@ -661,7 +661,7 @@ def makeLinuxX86System(
 ):
     # Build up the x86 system and then specialize it for Linux
     self = makeX86System(mem_mode, numCPUs, mdesc, X86FsLinux(), Ruby)
-    
+
     # Attach the X86 Terminal
     self.pc.attachX86Terminal(cossim_enabled, nodeNum) #COSSIM
 
@@ -806,13 +806,13 @@ def makeDistRoot(
 
     return self
 
-def makeCOSSIMRoot(full_system, testSystem, dumpfile,nodeNumber, 
+def makeCOSSIMRoot(full_system, testSystem, dumpfile,nodeNumber,
 		   _TotalNodes, sys_clock, synch_time,_RxPacketTime):
-  
+
     self = Root(full_system = full_system)
     self.system = testSystem
     self.etherlink = COSSIMEtherLink(nodeNum=nodeNumber, TotalNodes=_TotalNodes, sys_clk=sys_clock,SynchTime=synch_time, RxPacketTime=_RxPacketTime) #system_clock is used for synchronization
-   
+
 
     if hasattr(testSystem, 'realview'): # COSSIM ARM Implementation #
         self.etherlink.interface = Parent.system.realview.ethernet.interface

@@ -33,7 +33,15 @@ from ...runtime import get_runtime_isa
 from ...utils.override import overrides
 from ...utils.requires import requires
 
-from m5.objects import BaseMMU, Port, BaseCPU, Process
+from m5.objects import (
+    BaseMMU,
+    Port,
+    BaseCPU,
+    Process,
+    PcCountTracker,
+    PcCountTrackerManager,
+)
+from m5.params import PcCountPair
 
 
 class BaseCPUCore(AbstractCore):
@@ -153,15 +161,29 @@ class BaseCPUCore(AbstractCore):
         return self.core.mmu
 
     @overrides(AbstractCore)
-    def set_simpoint(self, inst_starts: List[int], init: bool) -> None:
-        if init:
-            self.core.simpoint_start_insts = sorted(set(inst_starts))
-        else:
+    def _set_simpoint(
+        self, inst_starts: List[int], board_initialized: bool
+    ) -> None:
+        if board_initialized:
             self.core.scheduleSimpointsInstStop(sorted(set(inst_starts)))
+        else:
+            self.core.simpoint_start_insts = sorted(set(inst_starts))
 
     @overrides(AbstractCore)
-    def set_inst_stop_any_thread(self, inst: int, init: bool) -> None:
-        if init:
-            self.core.max_insts_any_thread = inst
-        else:
+    def _set_inst_stop_any_thread(
+        self, inst: int, board_initialized: bool
+    ) -> None:
+        if board_initialized:
             self.core.scheduleInstStopAnyThread(inst)
+        else:
+            self.core.max_insts_any_thread = inst
+
+    @overrides(AbstractCore)
+    def add_pc_tracker_probe(
+        self, target_pair: List[PcCountPair], manager: PcCountTrackerManager
+    ) -> None:
+        pair_tracker = PcCountTracker()
+        pair_tracker.targets = target_pair
+        pair_tracker.core = self.core
+        pair_tracker.ptmanager = manager
+        self.core.probeListener = pair_tracker

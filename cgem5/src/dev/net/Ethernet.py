@@ -2,8 +2,8 @@
 # All rights reserved.
 #
 # ----------------------------------------------------------------------------
-# Copyright (c) 2022, H2020 COSSIM.
-# Copyright (c) 2022, Exascale Performance Systems (EXAPSYS)
+# Copyright (c) 2023, H2020 COSSIM.
+# Copyright (c) 2023, Exascale Performance Systems (EXAPSYS)
 # ----------------------------------------------------------------------------
 #
 # The license below extends only to copyright in the software and shall
@@ -96,6 +96,7 @@ class DistEtherLink(SimObject):
     dist_sync_on_pseudo_op = Param.Bool(False, "Start sync with pseudo_op")
     num_nodes = Param.UInt32("2", "Number of simulate nodes")
 
+
 class COSSIMEtherLink(SimObject):
     type = 'COSSIMEtherLink'
     cxx_header = "dev/net/COSSIMetherlink.hh"
@@ -129,7 +130,7 @@ class EtherSwitch(SimObject):
 
     dump = Param.EtherDump(NULL, "dump object")
     fabric_speed = Param.NetworkBandwidth(
-        "10Gbps", "switch fabric speed in " "bits per second"
+        "10Gbps", "switch fabric speed in bits per second"
     )
     interface = VectorEtherInt("Ethernet Interface")
     output_buffer_size = Param.MemorySize(
@@ -169,7 +170,7 @@ class EtherTapStub(EtherTapBase):
     cxx_header = "dev/net/ethertap.hh"
     cxx_class = "gem5::EtherTapStub"
 
-    port = Param.UInt16(3500, "Port helper should send packets to")
+    port = Param.HostSocket(3500, "Port/socket helper should send packets to")
 
 
 class EtherDump(SimObject):

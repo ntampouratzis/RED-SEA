@@ -107,11 +107,10 @@ board.set_kernel_disk_workload(
 print("Running with ISA: " + processor.get_isa().name)
 print()
 root = Root(full_system=True, system=board)
+board._pre_instantiate()
 m5.instantiate()
 print("Beginning simulation!")
 
 exit_event = m5.simulate(args.max_ticks)
 
-print(
-    "Exiting @ tick {} because {}.".format(m5.curTick(), exit_event.getCause())
-)
+print(f"Exiting @ tick {m5.curTick()} because {exit_event.getCause()}.")

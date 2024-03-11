@@ -61,7 +61,7 @@ class SimpleUart(Uart):
     byte_order = Param.ByteOrder("little", "Device byte order")
     pio_size = Param.Addr(0x4, "Size of address range")
     end_on_eot = Param.Bool(
-        False, "End the simulation when a EOT is " "received on the UART"
+        False, "End the simulation when a EOT is received on the UART"
     )
 
 
@@ -82,5 +82,5 @@ class RiscvUart8250(Uart8250):
         node.append(FdtPropertyWords("interrupts", [platform.uart_int_id]))
         node.append(FdtPropertyWords("clock-frequency", [0x384000]))
         node.append(FdtPropertyWords("interrupt-parent", state.phandle(plic)))
-        node.appendCompatible(["ns8250"])
+        node.appendCompatible(["ns8250", "ns16550a"]) #COSSIM
         yield node

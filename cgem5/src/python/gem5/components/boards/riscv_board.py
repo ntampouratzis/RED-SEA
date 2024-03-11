@@ -45,7 +45,8 @@ from m5.objects import (
     BadAddr,
     Bridge,
     PMAChecker,
-    RiscvLinux,
+    #RiscvLinux, #COSSIM
+    RiscvBootloaderKernelWorkload, #COSSIM
     AddrRange,
     IOXBar,
     RiscvRTC,
@@ -101,7 +102,9 @@ class RiscvBoard(AbstractSystemBoard, KernelDiskWorkload):
 
     @overrides(AbstractSystemBoard)
     def _setup_board(self) -> None:
-        self.workload = RiscvLinux()
+        #self.workload = RiscvLinux() #COSSIM
+
+        self.workload = RiscvBootloaderKernelWorkload() #COSSIM
 
         # Contains a CLINT, PLIC, UART, and some functions for the dtb, etc.
         self.platform = HiFive()
@@ -140,10 +143,10 @@ class RiscvBoard(AbstractSystemBoard, KernelDiskWorkload):
         # general enough.
         self._on_chip_devices = [self.platform.clint, self.platform.plic]
         self._off_chip_devices = [self.platform.uart, self.disk, self.rng]
-        
-        
+
     def readScript(self, script):
         self.readfile = script #COSSIM
+
 
     def _setup_io_devices(self) -> None:
         """Connect the I/O devices to the I/O bus"""
@@ -252,7 +255,7 @@ class RiscvBoard(AbstractSystemBoard, KernelDiskWorkload):
         root.appendCompatible(["riscv-virtio"])
 
         for mem_range in self.mem_ranges:
-            node = FdtNode("memory@%x" % int(mem_range.start))
+            node = FdtNode(f"memory@{int(mem_range.start):x}")
             node.append(FdtPropertyStrings("device_type", ["memory"]))
             node.append(
                 FdtPropertyWords(
@@ -262,6 +265,12 @@ class RiscvBoard(AbstractSystemBoard, KernelDiskWorkload):
                 )
             )
             root.append(node)
+
+        node = FdtNode(f"chosen")                                             #COSSIM
+        bootargs = " ".join(self.get_default_kernel_args())                   #COSSIM
+        node.append(FdtPropertyStrings("bootargs", [bootargs]))               #COSSIM
+        node.append(FdtPropertyStrings("stdout-path", ["/uart@10000000"]))    #COSSIM
+        root.append(node)                                                     #COSSIM
 
         # See Documentation/devicetree/bindings/riscv/cpus.txt for details.
         cpus_node = FdtNode("cpus")
@@ -436,7 +445,7 @@ class RiscvBoard(AbstractSystemBoard, KernelDiskWorkload):
         uart_node.append(
             FdtPropertyWords("interrupt-parent", soc_state.phandle(plic))
         )
-        uart_node.appendCompatible(["ns8250"])
+        uart_node.appendCompatible(["ns8250", "ns16550a"])     #COSSIM
         soc_node.append(uart_node)
 
         # VirtIO MMIO disk node
@@ -476,10 +485,12 @@ class RiscvBoard(AbstractSystemBoard, KernelDiskWorkload):
 
     @overrides(KernelDiskWorkload)
     def _add_disk_to_board(self, disk_image: AbstractResource):
-        image = CowDiskImage(
-            child=RawDiskImage(read_only=True), read_only=False
-        )
-        image.child.image_file = disk_image.get_local_path()
+        #image = CowDiskImage(
+        #    child=RawDiskImage(read_only=True), read_only=False
+        #)
+        #image.child.image_file = disk_image.get_local_path()
+        image = RawDiskImage(read_only=False)
+        image.image_file = disk_image.get_local_path()
         self.disk.vio.image = image
 
         # Note: The below is a bit of a hack. We need to wait to generate the
@@ -489,13 +500,15 @@ class RiscvBoard(AbstractSystemBoard, KernelDiskWorkload):
         self._setup_pma()
 
         # Default DTB address if bbl is built with --with-dts option
-        self.workload.dtb_addr = 0x87E00000
+        #self.workload.dtb_addr = 0x87E00000 #COSSIM
 
         self.generate_device_tree(m5.options.outdir)
         self.workload.dtb_filename = os.path.join(
             m5.options.outdir, "device.dtb"
         )
 
+        self.workload.dtb_addr = 0x87E00000 #COSSIM
+
     @overrides(KernelDiskWorkload)
     def get_default_kernel_args(self) -> List[str]:
-        return ["console=ttyS0", "root={root_value}", "rw"]
+        return ["console=ttyS0", "root={root_value}", "rw init=/root/gem5_init.sh"]

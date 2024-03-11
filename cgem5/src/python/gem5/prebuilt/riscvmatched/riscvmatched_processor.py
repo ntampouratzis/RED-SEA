@@ -43,13 +43,14 @@ class U74Processor(BaseCPUProcessor):
     def __init__(
         self,
         is_fs: bool,
+        num_cores: int, #COSSIM
     ) -> None:
         self._cpu_type = CPUTypes.MINOR
-        super().__init__(cores=self._create_cores(is_fs))
+        super().__init__(cores=self._create_cores(is_fs, num_cores)) #COSSIM
 
-    def _create_cores(self, is_fs: bool):
+    def _create_cores(self, is_fs: bool, num_cores: int):
         if is_fs:
-            num_cores = 4
+            num_cores = num_cores  #COSSIM
         else:
             num_cores = 1
         return [U74Core(core_id=i) for i in range(num_cores)]

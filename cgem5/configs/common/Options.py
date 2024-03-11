@@ -2,10 +2,9 @@
 # All rights reserved.
 #
 # ----------------------------------------------------------------------------
-# Copyright (c) 2022, H2020 COSSIM.
-# Copyright (c) 2022, Exascale Performance Systems (EXAPSYS)
+# Copyright (c) 2023, H2020 COSSIM.
+# Copyright (c) 2023, Exascale Performance Systems (EXAPSYS)
 # ----------------------------------------------------------------------------
-#
 # The license below extends only to copyright in the software and shall
 # not be construed as granting a license to any other intellectual
 # property including but not limited to intellectual property relating
@@ -222,7 +221,7 @@ def addNoISAOptions(parser):
         "--maxtime",
         type=float,
         default=None,
-        help="Run to the specified absolute simulated time in " "seconds",
+        help="Run to the specified absolute simulated time in seconds",
     )
     parser.add_argument(
         "-P",
@@ -696,7 +695,7 @@ def addSEOptions(parser):
         "-o",
         "--options",
         default="",
-        help="""The options to pass to the binary, use " "
+        help="""The options to pass to the binary, use
                               around the entire string""",
     )
     parser.add_argument(
@@ -839,8 +838,7 @@ def addFSOptions(parser):
         action="store",
         type=str,
         dest="benchmark",
-        help="Specify the benchmark to run. Available benchmarks: %s"
-        % DefinedBenchmarks,
+        help=f"Specify the benchmark to run. Available benchmarks: {DefinedBenchmarks}",
     )
 
     # Metafile options
@@ -852,23 +850,23 @@ def addFSOptions(parser):
         help="Specify the filename to dump a pcap capture of the"
         "ethernet traffic",
     )
-    
+
     #COSSIM Options
     parser.add_argument("--cossim", action="store_true",
                       help="COSSIM distributed gem5 simulation.")
-    
+
     parser.add_argument("--nodeNum", action="store", type=int, dest="nodeNum", default=0,
                       help="Specify the number of node")
-    
+
     parser.add_argument("--SynchTime", action="store", type=str, dest="SynchTime",
                       help="Specify the Synchronization Time. For example: --SynchTime=1ms")
-    
+
     parser.add_argument("--RxPacketTime", action="store", type=str, dest="RxPacketTime",
                       help="Specify the minimum time in which the node can accept packet from the OMNET++. For example: --SynchTime=1ms")
-    
+
     parser.add_argument("--TotalNodes", action="store", type=str, dest="TotalNodes", default=1,
                       help="Specify the total number of nodes")
-    
+
     parser.add_argument("--mcpat-xml", action="store", type=str, default="empty", dest="McPATXml",
                       help="Specify the McPAT xml ProcessorDescriptionFile")
 

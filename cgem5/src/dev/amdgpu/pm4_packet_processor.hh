@@ -141,7 +141,9 @@ class PM4PacketProcessor : public DmaVirtDevice
     void mapQueues(PM4Queue *q, PM4MapQueues *pkt);
     void unmapQueues(PM4Queue *q, PM4UnmapQueues *pkt);
     void doneMQDWrite(Addr mqdAddr, Addr addr);
-    void mapProcess(PM4Queue *q, PM4MapProcess *pkt);
+    void mapProcess(uint32_t pasid, uint64_t ptBase, uint32_t shMemBases);
+    void mapProcessGfx9(PM4Queue *q, PM4MapProcess *pkt);
+    void mapProcessGfx90a(PM4Queue *q, PM4MapProcessMI200 *pkt);
     void processMQD(PM4MapQueues *pkt, PM4Queue *q, Addr addr, QueueDesc *mqd,
                     uint16_t vmid);
     void processSDMAMQD(PM4MapQueues *pkt, PM4Queue *q, Addr addr,
@@ -171,6 +173,7 @@ class PM4PacketProcessor : public DmaVirtDevice
     void setHqdPqRptrReportAddrHi(uint32_t data);
     void setHqdPqWptrPollAddr(uint32_t data);
     void setHqdPqWptrPollAddrHi(uint32_t data);
+    void setHqdPqControl(uint32_t data);
     void setHqdIbCtrl(uint32_t data);
     void setRbVmid(uint32_t data);
     void setRbCntl(uint32_t data);

@@ -45,7 +45,6 @@ The following Table describes the additional GEM5 parameters that have to be def
 First of all, `--cossim` parameter declares the mode of cgem5; if it is placed, cgem5 is working in COSSIM mode, else it is working in standalone mode.
 In addition, `--SynchTime` is the Global Synchronization Time which is a trade-off between simulation speed and simulation accuracy, while the `--RxPacketTime` is mostly defined by the latency of the network interface and it doesn’t constrain the simulation speed. 
 Furthermore, `--nodeNum` and `--TotalNodes` are the number ID of cgem5 system and the total number of cgem5 systems in the network respectively. 
-Finally, `--mcpat-xml` specifies the McPAT xml Processor Description File.
 In all of the above parameters the simulated time is converted automatically to CPU ticks based on CPU frequency because each cgem5 system can simulate different types of CPUs with different clock cycles.
 
 Parameter Name | Usage example | Description
@@ -55,7 +54,6 @@ SynchTime | --SynchTime=10ms | Simulated time which all cgem5 systems are synchr
 RxPacketTime | --RxPacketTime=2ms | The minimum simulated time which the cgem5 system can receive Packet
 nodeNum | --nodeNum=0 | The number ID of this cgem5 System
 TotalNodes | --TotalNodes=2 | The total number of cgem5 Systems
-mcpat-xml | --mcpat-xml=ARM_AtomicSimpleCPU_template.xml | Specifies the McPAT xml Processor Description File
 
 ## Licensing
 

@@ -2,7 +2,7 @@
 
 This repository includes the modified gem5 simulator that integrates with the rest of the COSSIM framework. The cgem5 supports interconnection with IEEE HLA interfaces and modifies the network interface so that it can communicate with other cgem5 nodes through a network simulator. It should be noted that cgem5 can be used independently of COSSIM as a standalone package incorporating all the changes that have been integrated to the official GEM5 release (v23.0.1.0).
 
-## Differences between cgem5 and official gem5 v22.0.1.0
+## Differences between cgem5 and official gem5 v23.0.1.0
 
 In the following subsections the limitations of the current, publicly available, version of GEM5 are described in tandem with the modifications and extensions that have been implemented to alleviate those restrictions.
 

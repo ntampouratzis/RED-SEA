@@ -1,12 +1,14 @@
 # cgem5 - COSSIM-modified gem5 version. 
 
-This repository includes the modified gem5 simulator that integrates with the rest of the COSSIM framework. The cgem5 supports interconnection with IEEE HLA interfaces and modifies the network interface so that it can communicate with other cgem5 nodes through a network simulator. It should be noted that cgem5 can be used independently of COSSIM as a standalone package incorporating all the changes that have been integrated to the official GEM5 November 2022 release (v22.0.0.1).
+This repository includes the modified gem5 simulator that integrates with the rest of the COSSIM framework. The cgem5 supports interconnection with IEEE HLA interfaces and modifies the network interface so that it can communicate with other cgem5 nodes through a network simulator. It should be noted that cgem5 can be used independently of COSSIM as a standalone package incorporating all the changes that have been integrated to the official GEM5 release (v23.0.1.0).
 
-## Differences between cgem5 and official gem5 v22.0.0.1
+## Differences between cgem5 and official gem5 v22.0.1.0
 
 In the following subsections the limitations of the current, publicly available, version of GEM5 are described in tandem with the modifications and extensions that have been implemented to alleviate those restrictions.
 
 ### Extending the Network Model of GEM5
+
+The integration of PCI Host to RISC-V GEM5 board and adaptation of GEM5 ethernet card to it in order to simulate multi-node RISC-V systems in COSSIM simulator (we merge the development code in the official GEM5 repository).
 
 In GEM5’s publicly available repositories, the only network interface card implemented, tested and verified is the Intel 8254x based gigabit Ethernet adapter. It is provided as a PCI GEM5 network device using the e1000 Linux driver.
 
@@ -55,15 +57,6 @@ nodeNum | --nodeNum=0 | The number ID of this cgem5 System
 TotalNodes | --TotalNodes=2 | The total number of cgem5 Systems
 mcpat-xml | --mcpat-xml=ARM_AtomicSimpleCPU_template.xml | Specifies the McPAT xml Processor Description File
 
-
-## Compiling and executing cgem5
-
-Please read the [README](README) file.
-
-## Using cgem5 in the context of the COSSIM simulation framework
-
-Please refer to [COSSIM _framework](https://github.com/H2020-COSSIM/COSSIM_framework) repository for all required instructions.
-
 ## Licensing
 
 Refer to the [LICENSE](LICENSE) and [COPYING](COPYING) files included. Individual license may be present in different files in the source codes.
@@ -76,5 +69,5 @@ Please contact for any questions.
 
 ## Acknowledgments
 
-Code developed for the H2020-COSSIM project.
+Code developed for the H2020-REDSEA project.
 

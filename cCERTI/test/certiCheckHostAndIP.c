@@ -34,7 +34,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <rpc/rpc.h>
+//#include <rpc/rpc.h>
 
 /* Add missing declaration on MacOS rpclib 
  * which generate a spurious warning
@@ -90,8 +90,8 @@ int main(int argc, char* argv[]) {
             myu.parts[0], myu.parts[1], myu.parts[2], myu.parts[3],
             (myhost_byaddr->h_addrtype == AF_INET6 ?  "AF_INET6" : "AF_INET"));
 
-    get_myaddress(&my_addr);
-    myu.addr = (uint32_t)(my_addr.sin_addr.s_addr);
+//     get_myaddress(&my_addr);
+//     myu.addr = (uint32_t)(my_addr.sin_addr.s_addr);
     printf("@IP returned is <%d.%d.%d.%d> (as returned by get_myaddress (rpclib))\n",
             myu.parts[0], myu.parts[1], myu.parts[2], myu.parts[3]);
 #ifdef LINUX

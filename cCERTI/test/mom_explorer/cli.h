@@ -5,6 +5,8 @@
 #include <map>
 #include <vector>
 
+#include <string>
+
 class cli {
 public:
     cli();

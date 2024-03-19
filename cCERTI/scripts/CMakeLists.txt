@@ -28,6 +28,7 @@ install(FILES
   DESTINATION bin)
 
 install(FILES
+  FindTIRPC.cmake
   FindCERTI.cmake
   UseCERTI.cmake
   FindRTI.cmake

@@ -1,71 +1,90 @@
-# cgem5 - COSSIM-modified gem5 version. 
+# The gem5 Simulator
 
-This repository includes the modified gem5 simulator that integrates with the rest of the COSSIM framework. The cgem5 supports interconnection with IEEE HLA interfaces and modifies the network interface so that it can communicate with other cgem5 nodes through a network simulator. It should be noted that cgem5 can be used independently of COSSIM as a standalone package incorporating all the changes that have been integrated to the official GEM5 release (v23.0.1.0).
+This is the repository for the gem5 simulator. It contains the full source code
+for the simulator and all tests and regressions.
 
-## Differences between cgem5 and official gem5 v23.0.1.0
+The gem5 simulator is a modular platform for computer-system architecture
+research, encompassing system-level architecture as well as processor
+microarchitecture. It is primarily used to evaluate new hardware designs,
+system software changes, and compile-time and run-time system optimizations.
 
-In the following subsections the limitations of the current, publicly available, version of GEM5 are described in tandem with the modifications and extensions that have been implemented to alleviate those restrictions.
+The main website can be found at <http://www.gem5.org>.
 
-### Extending the Network Model of GEM5
+## Getting started
 
-The integration of PCI Host to RISC-V GEM5 board and adaptation of GEM5 ethernet card to it in order to simulate multi-node RISC-V systems in COSSIM simulator (we merge the development code in the official GEM5 repository).
+A good starting point is <http://www.gem5.org/about>, and for
+more information about building the simulator and getting started
+please see <http://www.gem5.org/documentation> and
+<http://www.gem5.org/documentation/learning_gem5/introduction>.
 
-In GEM5’s publicly available repositories, the only network interface card implemented, tested and verified is the Intel 8254x based gigabit Ethernet adapter. It is provided as a PCI GEM5 network device using the e1000 Linux driver.
+## Building gem5
 
-However, the latest version of GEM5 supports this real-network device only on ARM-based architectures. In the scope of COSSIM, GEM5 has been recently modified so as to support the Intel 8254x network card for the x86 ISA.
+To build gem5, you will need the following software: g++ or clang,
+Python (gem5 links in the Python interpreter), SCons, zlib, m4, and lastly
+protobuf if you want trace capture and playback support. Please see
+<http://www.gem5.org/documentation/general_docs/building> for more details
+concerning the minimum versions of these tools.
 
-In addition to the network interface cards, GEM5 supports networking through a simple Etherlink device. Etherlink is a virtual dummy link which emulates a cable over which Ethernet packets are sent and received without any delay (no switching or routing functionality is implemented).
+Once you have all dependencies resolved, execute
+`scons build/ALL/gem5.opt` to build an optimized version of the gem5 binary
+(`gem5.opt`) containing all gem5 ISAs. If you only wish to compile gem5 to
+include a single ISA, you can replace `ALL` with the name of the ISA. Valid
+options include `ARM`, `NULL`, `MIPS`, `POWER`, `SPARC`, and `X86` The complete
+list of options can be found in the build_opts directory.
 
-In the scope of COSSIM, these limitations are unacceptably restrictive. Therefore Etherlink could not be used in its current form and thus it had been modified, while NICs supporting more protocols have been developed. Since NIC device models cannot easily be developed without specific information from their manufacturer -the Intel NIC model used in GEM5 has been contributed by Intel itself- and in order to support different physical networks, the COSSIM novel approach is to tap the Ethernet packets from Etherlink and send them to the Networking Simulator modifying at the same time the packets to match the specific network protocol required by the simulated application (i.e. Ethernet, WiFi, 3G, etc).
+See https://www.gem5.org/documentation/general_docs/building for more
+information on building gem5.
 
-In order to achieve the aforementioned objectives the CERTI HLA interface has been employed. Specifically, the COSSIMlib has been integrated to the main core of the GEM5 system through Etherlink. COSSIMlib is a wrapper to an RTI Ambassador Class which is responsible for the exchange of the messages over the network with the HLA Server via TCP and UDP sockets. COSSIMlib exchanges Ethernet Packets captured from the Etherlink Device and sends (and accordingly receives) them to (from) the HLA Server. The HLA Server forwards these messages to a proper interface of the adopted Network Simulator that implements all the network related functionality.
+## The Source Tree
 
-### Supporting Parallel/Distributed Simulation
+The main source tree includes these subdirectories:
 
-The simplistic network model of GEM5 has another serious limitation. It only supports the simulation of two identical networked systems (for example two identically configured ARM processors with exactly the same peripherals and memory configuration). Furthermore, the simulation of both systems is executed within the same thread, thus a serious performance penalty is triggered while no synchronization primitives between the two systems are provided.
+* build_opts: pre-made default configurations for gem5
+* build_tools: tools used internally by gem5's build process.
+* configs: example simulation configuration scripts
+* ext: less-common external packages needed to build gem5
+* include: include files for use in other programs
+* site_scons: modular components of the build system
+* src: source code of the gem5 simulator. The C++ source, Python wrappers, and Python standard library are found in this directory.
+* system: source for some optional system software for simulated systems
+* tests: regression tests
+* util: useful utility programs and files
 
-By using HLA-complaint cGEM5 interfaces combined with a network simulator, the different cGEM5 instances can be efficiently connected. Each cGEM5 instance models a single node and different GEM5 instances are connected through a simulated network (more precisely through HLA links and a network simulator). As a result, all the following limitations of a conventional GEM5 simulation can be overcome:
+## gem5 Resources
 
-- there are no limitations for identically configured systems.
-- there are no limitations on the number of cGEM5 instances that are interconnected together; the overall system can be scaled to support as many processing nodes as required.
-- parallelism can be extracted at the process level, since multiple cGEM5 instances can be executed in parallel. Furthermore, as CERTI HLA functions over IP, the different cGEM5 instances do not even need to be on the same physical machine and the overall COSSIM simulator can thus be executed efficiently in a highly distributed manner.
+To run full-system simulations, you may need compiled system firmware, kernel
+binaries and one or more disk images, depending on gem5's configuration and
+what type of workload you're trying to run. Many of these resources can be
+obtained from <https://resources.gem5.org>.
 
-These changes have been proposed in the paper: 
+More information on gem5 Resources can be found at
+<https://www.gem5.org/documentation/general_docs/gem5_resources/>.
 
-<a id="1">[1]</a> 
-N. Tampouratzis, I. Papaefstathiou, A. Nikitakis, A. Brokalakis,
-S. Andrianakis, A. Dollas, M. Marcon, and E. Plebani, “A novel,
-highly integrated simulator for parallel and distributed systems,”
-ACM Trans. Archit. Code Optim., vol. 17, no. 1, Mar. 2020.
-Available: https://dl.acm.org/doi/10.1145/3378934
+## Getting Help, Reporting bugs, and Requesting Features
 
-## Additional Parameters
+We provide a variety of channels for users and developers to get help, report
+bugs, requests features, or engage in community discussions. Below
+are a few of the most common we recommend using.
 
-The following Table describes the additional GEM5 parameters that have to be defined in order to configure the communication between cgem5 and the network simulator as well as among different cgem5 instances. 
-First of all, `--cossim` parameter declares the mode of cgem5; if it is placed, cgem5 is working in COSSIM mode, else it is working in standalone mode.
-In addition, `--SynchTime` is the Global Synchronization Time which is a trade-off between simulation speed and simulation accuracy, while the `--RxPacketTime` is mostly defined by the latency of the network interface and it doesn’t constrain the simulation speed. 
-Furthermore, `--nodeNum` and `--TotalNodes` are the number ID of cgem5 system and the total number of cgem5 systems in the network respectively. 
-In all of the above parameters the simulated time is converted automatically to CPU ticks based on CPU frequency because each cgem5 system can simulate different types of CPUs with different clock cycles.
+* **GitHub Discussions**: A GitHub Discussions page. This can be used to start
+discussions or ask questions. Available at
+<https://github.com/orgs/gem5/discussions>.
+* **GitHub Issues**: A GitHub Issues page for reporting bugs or requesting
+features. Available at <https://github.com/gem5/gem5/issues>.
+* **Jira Issue Tracker**: A Jira Issue Tracker for reporting bugs or requesting
+features. Available at <https://gem5.atlassian.net/>.
+* **Slack**: A Slack server with a variety of channels for the gem5 community
+to engage in a variety of discussions. Please visit
+<https://www.gem5.org/join-slack> to join.
+* **gem5-users@gem5.org**: A mailing list for users of gem5 to ask questions
+or start discussions. To join the mailing list please visit
+<https://www.gem5.org/mailing_lists>.
+* **gem5-dev@gem5.org**: A mailing list for developers of gem5 to ask questions
+or start discussions. To join the mailing list please visit
+<https://www.gem5.org/mailing_lists>.
 
-Parameter Name | Usage example | Description
------------- | ------------- | -------------
-cossim | --cossim | Declares the cgem5 mode
-SynchTime | --SynchTime=10ms | Simulated time which all cgem5 systems are synchronized periodically
-RxPacketTime | --RxPacketTime=2ms | The minimum simulated time which the cgem5 system can receive Packet
-nodeNum | --nodeNum=0 | The number ID of this cgem5 System
-TotalNodes | --TotalNodes=2 | The total number of cgem5 Systems
+## Contributing to gem5
 
-## Licensing
-
-Refer to the [LICENSE](LICENSE) and [COPYING](COPYING) files included. Individual license may be present in different files in the source codes.
-
-#### Authors
-
-* Nikolaos Tampouratzis (tampouratzis@exapsys.eu)
-
-Please contact for any questions.
-
-## Acknowledgments
-
-Code developed for the H2020-REDSEA project.
-
+We hope you enjoy using gem5. When appropriate we advise charing your
+contributions to the project. <https://www.gem5.org/contributing> can help you
+get started. Additional information can be found in the CONTRIBUTING.md file.

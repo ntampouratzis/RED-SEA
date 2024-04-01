@@ -102,6 +102,24 @@ omnetpp
 o	Select Project -> Clean -> Select “INET” -> Select “Start a build immediately” -> Select “Build only the selected projects” -> Press “OK”
 o	Select Project -> Clean -> Select “HLANode” & “test” -> Select “Start a build immediately” -> Select “Build only the selected projects” -> Press “OK”
 
+# Install Riscv qemu on Ubuntu 22.04
+
+cd $HOME
+sudo apt-get install ninja-build
+sudo apt install libglib2.0-dev libpixman-1-dev
+mkdir riscv-ubuntu/
+cd riscv-ubuntu/
+git clone https://github.com/qemu/qemu
+cd qemu/
+git checkout 0021c4765a6b83e5b09409b75d50c6caaa6971b9
+./configure --target-list=riscv64-softmmu
+make -j $(nproc)
+make install
+
+# For Ubuntu 22.04 and newer 
+sudo apt install qemu-system-misc opensbi u-boot-qemu qemu-utils
+sudo apt install gcc-riscv64-linux-gnu g++-riscv64-linux-gnu
+
 
 
 
